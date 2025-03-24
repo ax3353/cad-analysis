@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
-import org.kabeja.dxf.helpers.Point;
 import org.kabeja.parser.Parser;
 import org.kabeja.parser.ParserBuilder;
 import org.springframework.util.StringUtils;
@@ -45,7 +44,14 @@ public class OutboundPipelineAnalyzer {
             Pattern.CASE_INSENSITIVE
     );
 
-    private final List<PipeInfo> pipeInfos = new ArrayList<>();
+    private static final String REGEX =
+            "(法兰球阀|金属软管|法兰盖)" + // 目标配件类型
+                    "(DN\\d+(?:\\.\\d+)?)" + // 配件规格
+                    "(?!.*\\d+\\s*[m米])"; // 排除含长度单位的情况
+    private static final Pattern FLANGE_PATTERN = Pattern.compile(REGEX, Pattern.CASE_INSENSITIVE);
+
+    private final List<TagData> pipeInfos = new ArrayList<>();
+    private final List<TagData> flangeInfos = new ArrayList<>();
     private final ObjectMapper objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     private final List<String> errorLog = new ArrayList<>();
 
@@ -171,29 +177,36 @@ public class OutboundPipelineAnalyzer {
     private void processTextEntity(DXFText text, String layerName) {
         try {
             String currentText = text.getText().trim().replaceAll("\\s+", "");
-            Matcher matcher = PIPE_PATTERN.matcher(currentText);
-            if (matcher.find()) {
-                String spec = matcher.group(1).toUpperCase();
-                String groupAlias = matcher.group(2);
+            Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
+            Matcher flangeMatcher = FLANGE_PATTERN.matcher(currentText);
+
+            if (pipeMatcher.find()) {
+                String spec = pipeMatcher.group(1).toUpperCase();
+                String groupAlias = pipeMatcher.group(2);
                 String alias = spec;
                 if (StringUtils.hasText(groupAlias)) {
                     alias = spec + "*" + groupAlias;
                 }
-                BigDecimal length = new BigDecimal(matcher.group(3));
-
-                Point insertPoint = text.getInsertPoint();
-                String position = String.format("(%.2f,%.2f)", insertPoint.getX(), insertPoint.getY());
-
-                pipeInfos.add(new PipeInfo(
+                BigDecimal length = new BigDecimal(pipeMatcher.group(3));
+                pipeInfos.add(new TagData(
                         text.getID(),
                         layerName,
                         "管道",
                         spec,
                         alias,
                         currentText,
-                        position,
                         length,
-                        "m"
+                        "m"));
+            } else if (flangeMatcher.find()) {
+                flangeInfos.add(new TagData(
+                        text.getID(),
+                        layerName,
+                        "法兰",
+                        flangeMatcher.group(1),
+                        flangeMatcher.group(2).toUpperCase(),
+                        currentText,
+                        new BigDecimal(1),
+                        "个"
                 ));
             }
         } catch (Exception e) {
@@ -202,22 +215,25 @@ public class OutboundPipelineAnalyzer {
     }
 
     public String generateSummaryJson() throws JsonProcessingException {
-        Map<String, List<PipeInfo>> grouped = pipeInfos.stream()
-                .collect(Collectors.groupingBy(PipeInfo::getAlias));
+        List<TagData> dataList = new ArrayList<>();
+        dataList.addAll(pipeInfos);
+        dataList.addAll(flangeInfos);
+
+        Map<String, List<TagData>> grouped = dataList.stream()
+                .collect(Collectors.groupingBy(TagData::getAlias));
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Map.Entry<String, List<PipeInfo>> entry : grouped.entrySet()) {
+        for (Map.Entry<String, List<TagData>> entry : grouped.entrySet()) {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("alias", entry.getKey());
             map.put("spec", entry.getValue().get(0).getSpec());
             map.put("type", entry.getValue().get(0).getType());
             map.put("unit", entry.getValue().get(0).getUnit());
             map.put("data", entry.getValue().stream()
-                    .map(PipeInfo::getData)
+                    .map(TagData::getData)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
             result.add(map);
         }
-
         return objectMapper.writeValueAsString(result);
     }
 
@@ -228,33 +244,30 @@ public class OutboundPipelineAnalyzer {
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
-    public static class PipeInfo {
+    public static class TagData {
         private String cadId;
         private String cadLayer;
         private String type;
         private String spec;
         private String alias;
         private String text;
-        private String position;
         private BigDecimal data;
         private String unit;
     }
 
     public static void main(String[] args) throws Exception {
-        boolean b = PIPE_PATTERN.matcher("D32-0.2m").find();
-        System.out.println(b);
         // 支持 HTTP/ZIP/DXF
-        OutboundPipelineAnalyzer extractor = new OutboundPipelineAnalyzer();
+        OutboundPipelineAnalyzer analyzer = new OutboundPipelineAnalyzer();
         String path = "D:\\1津都雅苑-出地管道.dxf";
 //        String path = "D:\\cad_file2.zip";
 //        String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file.zip";
 
-        if (extractor.executeAnalysis(path)) {
-            log.info("汇总数据: " + extractor.generateSummaryJson());
+        if (analyzer.executeAnalysis(path)) {
+            log.info("汇总数据: " + analyzer.generateSummaryJson());
         } else {
             log.info("分析失败");
         }
 
-        log.info("错误日志: " + extractor.getErrorLog());
+        log.info("错误日志: " + analyzer.getErrorLog());
     }
 }
