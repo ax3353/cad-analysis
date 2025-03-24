@@ -1,3 +1,7 @@
+file:
+  upload-path: D:/upload/
+#  upload-path: /tmp/upload/files/
+
 server:
   port: 8800
   servlet:
@@ -6,6 +10,14 @@ server:
 spring:
   application:
     name: jinghu-cad
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 200MB
+      location: ${file.upload-path}
+  web:
+    resources:
+      static-locations: classpath:/META-INF/resources/, classpath:/resources/, classpath:/static/, classpath:/public/, file:${file.upload-path}/
 
 #日志文件输出路径
 logging:

@@ -1,7 +1,6 @@
 package com.jinghu.cad.analysis.controller;
 
 import com.alibaba.fastjson.JSON;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinghu.cad.analysis.req.ReportRequest;
@@ -10,6 +9,7 @@ import com.jinghu.cad.analysis.utils.OutboundPipelineAnalyzer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -34,6 +35,9 @@ public class ReportController {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Value("${file.upload-path}")
+    private String uploadPath;
+
     @PostMapping("/report")
     public String report(@RequestBody ReportRequest request) {
         log.info("开始设计CAD图纸, 文件地址: " + request.getCad_files_url());
@@ -43,7 +47,7 @@ public class ReportController {
         File supplementFile = null;
         try {
             // 1. 下载 CAD 文件
-            cadZipFile = downloadToTempFile(request.getCad_files_url());
+            cadZipFile = downloadToTempFileEnhance(request.getCad_files_url());
             if (cadZipFile == null) {
                 return "CAD 文件下载失败";
             }
@@ -68,7 +72,7 @@ public class ReportController {
 
             // 5. 合并补充文件数据
             if (StringUtils.hasText(request.getSupplement_file_url())) {
-                supplementFile = downloadToTempFile(request.getSupplement_file_url());
+                supplementFile = downloadToTempFileEnhance(request.getSupplement_file_url());
                 List<Map<String, Object>> supplementData = excelToJson(supplementFile);
                 mergedData = mergeData(supplementData, mergedData);
             }
@@ -105,6 +109,20 @@ public class ReportController {
             }
         }
         return tempFile;
+    }
+
+    private File downloadToTempFileEnhance(String url) throws IOException {
+        if (!StringUtils.hasText(url)) {
+            return null;
+        }
+
+        String fileName = url.substring(url.lastIndexOf("/"));
+        File dest = Paths.get(uploadPath, "files", fileName).toFile();
+        if (dest.exists()) {
+            return dest;
+        } else {
+            return downloadToTempFile(url);
+        }
     }
 
     private List<Map<String, Object>> convertBuildingData(Map<String, String> data) {
