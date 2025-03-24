@@ -18,7 +18,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -32,7 +31,7 @@ import java.util.zip.ZipFile;
 public class BuildingPipelineAnalyzer {
 
     // 正则表达式和关键字配置
-    private final String regex = "(?<![^\\p{P}\\s])([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?![^\\p{P}\\s])";
+    private final String regex = "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)";
     private final Pattern layerPattern = Pattern.compile(regex);
     private final List<String> keywords = Arrays.asList("高位挂表", "低位挂表");
 
@@ -218,15 +217,23 @@ public class BuildingPipelineAnalyzer {
     }
 
     public static void main(String[] args) {
-//        BuildingPipelineAnalyzer analyzer = new BuildingPipelineAnalyzer();
-//        Map<String, String> result = analyzer.calcTotalLength("d:\\cad_file2.zip");
-//        System.out.println(result);
+        BuildingPipelineAnalyzer analyzer = new BuildingPipelineAnalyzer();
+        Map<String, String> result = analyzer.calcTotalLength("d:\\cad_file2.zip");
+        System.out.println(result);
 
-        String text = "盘管仅二层有";
-        String regex = "(?<![^\\p{P}\\s])([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?![^\\p{P}\\s])";
-        Matcher matcher = Pattern.compile(regex).matcher(text);
-        while (matcher.find()) {
-            System.out.println("匹配到: " + matcher.group());
-        }
+//        String text = " 二十层 "
+//                + "100F "
+//                + "、二十层"
+//                + "三层楼"
+//                + "零0层"
+//                + "01F"
+//                + "100F。"
+//                + "这是一层"
+//                + "独立词100F";
+//        String regex = "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)";
+//        Matcher matcher = Pattern.compile(regex).matcher(text);
+//        while (matcher.find()) {
+//            System.out.println("匹配到: " + matcher.group());
+//        }
     }
 }
