@@ -263,9 +263,9 @@ public class OutboundPipelineAnalyzer {
     public static void main(String[] args) throws Exception {
         // 支持 HTTP/ZIP/DXF
         OutboundPipelineAnalyzer extractor = new OutboundPipelineAnalyzer();
-        String path = "D:\\1津都雅苑-出地管道.dxf";
-//        String path = "D:\\cad_file2.zip";
-//        String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file.zip";
+//        String path = "D:\\1津都雅苑-出地管道.dxf";
+        String path = "D:\\cad_file2.zip";
+//        String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file2.zip";
 
         if (extractor.executeAnalysis(path)) {
             log.info("汇总数据: " + extractor.generateSummaryJson());

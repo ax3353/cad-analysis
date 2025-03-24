@@ -40,7 +40,7 @@ public class ReportController {
 
     @PostMapping("/report")
     public String report(@RequestBody ReportRequest request) {
-        log.info("开始设计CAD图纸, 文件地址: " + request.getCad_files_url());
+        log.info("开始分析CAD图纸, 文件地址: " + request.getCad_files_url());
 
         // 下载文件
         File cadZipFile = null;
@@ -183,7 +183,7 @@ public class ReportController {
         Map<String, Map<String, Object>> merged = new HashMap<>();
 
         Stream.concat(dataA.stream(), dataB.stream()).forEach(item -> {
-            String key = item.get("type") + "|" + item.get("spec");
+            String key = item.get("alias") + "|" + item.get("spec");
             Map<String, Object> existing = merged.get(key);
             BigDecimal currentValue = convertToBigDecimal(item.get("data"));
 
@@ -219,7 +219,7 @@ public class ReportController {
             try {
                 Files.delete(file.toPath());
             } catch (IOException e) {
-                System.err.println("删除临时文件失败: " + file.getAbsolutePath());
+                log.error("删除临时文件失败: " + file.getAbsolutePath());
             }
         }
     }
