@@ -1,0 +1,13 @@
+server:
+  port: 8800
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: jinghu-cad
+
+#日志文件输出路径
+logging:
+  file:
+    path: ./log
