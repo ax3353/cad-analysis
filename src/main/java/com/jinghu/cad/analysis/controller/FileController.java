@@ -3,6 +3,7 @@ package com.jinghu.cad.analysis.controller;
 import com.jinghu.cad.analysis.resp.R;
 import com.jinghu.cad.analysis.resp.UploadResp;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +23,7 @@ import java.util.UUID;
  * @date 2025/3/24 11:25
  */
 @RestController
+@CrossOrigin(origins = "*")
 public class FileController {
 
     @Value("${file.upload-path}")
