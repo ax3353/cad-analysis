@@ -37,14 +37,6 @@ import java.util.zip.ZipFile;
 public class OutboundPipelineAnalyzer {
 
     private static final Pattern THICKNESS_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)"); // 匹配整数或小数
-//    private static final Pattern PIPE_PATTERN = Pattern.compile(
-//            "(D21\\.3|D33\\.7|D42\\.4|D48\\.3|D60\\.3|D88\\.9|D76|DN80|D114|D159|dn63|dn90|dn110|dn160)x" +
-//                    THICKNESS_PATTERN.pattern() + // 匹配厚度（如 4.0）
-//                    "[-×]" + // 匹配分隔符（- 或 ×）
-//                    "(\\d+(?:\\.\\d+)?)[mM]", // 匹配长度（如 23m）
-//            Pattern.CASE_INSENSITIVE
-//    );
-
     private static final Pattern PIPE_PATTERN = Pattern.compile(
             "(D(?:N?\\d+(?:\\.\\d+)?))" + // 匹配直径（如 D32, DN80, D21.3）
                     "[-x×]" + // 分隔符：-、x 或 ×
