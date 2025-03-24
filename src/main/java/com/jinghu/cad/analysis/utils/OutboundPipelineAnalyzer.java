@@ -30,7 +30,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * 出地管道分析
+ * 出地管和法兰分析
  */
 @Slf4j
 public class OutboundPipelineAnalyzer {
@@ -219,23 +219,28 @@ public class OutboundPipelineAnalyzer {
         dataList.addAll(pipeInfos);
         dataList.addAll(flangeInfos);
 
+        // 按 alias 和 spec 共同分组
         Map<String, List<TagData>> grouped = dataList.stream()
-                .collect(Collectors.groupingBy(TagData::getAlias));
+                .collect(Collectors.groupingBy(tag -> tag.getAlias() + "|" + tag.getSpec()));
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map.Entry<String, List<TagData>> entry : grouped.entrySet()) {
+            List<TagData> items = entry.getValue();
+            String[] keys = entry.getKey().split("\\|");
+
             Map<String, Object> map = new LinkedHashMap<>();
-            map.put("alias", entry.getKey());
-            map.put("spec", entry.getValue().get(0).getSpec());
-            map.put("type", entry.getValue().get(0).getType());
-            map.put("unit", entry.getValue().get(0).getUnit());
-            map.put("data", entry.getValue().stream()
+            map.put("alias", keys[0]); // alias
+            map.put("spec", keys[1]);  // spec
+            map.put("type", items.get(0).getType());
+            map.put("unit", items.get(0).getUnit());
+            map.put("data", items.stream()
                     .map(TagData::getData)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
             result.add(map);
         }
         return objectMapper.writeValueAsString(result);
     }
+
 
     public String getErrorLog() {
         return errorLog.isEmpty() ? "无错误记录" : String.join("\n", errorLog);
@@ -257,17 +262,17 @@ public class OutboundPipelineAnalyzer {
 
     public static void main(String[] args) throws Exception {
         // 支持 HTTP/ZIP/DXF
-        OutboundPipelineAnalyzer analyzer = new OutboundPipelineAnalyzer();
+        OutboundPipelineAnalyzer extractor = new OutboundPipelineAnalyzer();
         String path = "D:\\1津都雅苑-出地管道.dxf";
 //        String path = "D:\\cad_file2.zip";
 //        String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file.zip";
 
-        if (analyzer.executeAnalysis(path)) {
-            log.info("汇总数据: " + analyzer.generateSummaryJson());
+        if (extractor.executeAnalysis(path)) {
+            log.info("汇总数据: " + extractor.generateSummaryJson());
         } else {
             log.info("分析失败");
         }
 
-        log.info("错误日志: " + analyzer.getErrorLog());
+        log.info("错误日志: " + extractor.getErrorLog());
     }
 }
