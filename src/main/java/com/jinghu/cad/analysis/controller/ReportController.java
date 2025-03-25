@@ -3,8 +3,8 @@ package com.jinghu.cad.analysis.controller;
 import com.alibaba.fastjson.JSON;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import com.jinghu.cad.analysis.req.ReportRequest;
-import com.jinghu.cad.analysis.utils.BuildingPipelineAnalyzer;
-import com.jinghu.cad.analysis.utils.OutboundPipelineAnalyzer;
+import com.jinghu.cad.analysis.utils.BuildingPipeAnalyzer;
+import com.jinghu.cad.analysis.utils.OutboundPipeAnalyzer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,19 +55,16 @@ public class ReportController {
             String cadZipFileAbsPath = cadZipFile.getAbsolutePath();
 
             // 2. 解析出地管数据
-            List<CadItem> pipeData = new ArrayList<>();
-            OutboundPipelineAnalyzer extractor = new OutboundPipelineAnalyzer();
-            if (extractor.executeAnalysis(cadZipFileAbsPath)) {
-                pipeData = extractor.generateSummary();
-            }
+            OutboundPipeAnalyzer outboundPipeAnalyzer = new OutboundPipeAnalyzer();
+            List<CadItem> outboundPipeData = outboundPipeAnalyzer.executeAnalysis(cadZipFileAbsPath);
 
             // 3. 解析建筑管道数据
-            BuildingPipelineAnalyzer analyzer = new BuildingPipelineAnalyzer();
-            CadItem buildingData = analyzer.calcTotalLength(cadZipFileAbsPath);
+            BuildingPipeAnalyzer buildingPipeAnalyzer = new BuildingPipeAnalyzer();
+            CadItem buildingData = buildingPipeAnalyzer.executeAnalysis(cadZipFileAbsPath);
             List<CadItem> buildingPipeData = Collections.singletonList(buildingData);
 
             // 4. 合并出地管和建筑管道数据
-            List<CadItem> mergedData = mergeData(pipeData, buildingPipeData);
+            List<CadItem> mergedData = mergeData(outboundPipeData, buildingPipeData);
 
             // 5. 合并补充文件数据
             if (StringUtils.hasText(supplementFileUrl)) {

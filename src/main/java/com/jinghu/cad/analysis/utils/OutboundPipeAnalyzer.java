@@ -1,7 +1,5 @@
 package com.jinghu.cad.analysis.utils;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import com.jinghu.cad.analysis.pojo.TagData;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +27,7 @@ import java.util.stream.Collectors;
  * 出地管和法兰分析
  */
 @Slf4j
-public class OutboundPipelineAnalyzer {
+public class OutboundPipeAnalyzer {
 
     private static final Pattern THICKNESS_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)"); // 匹配整数或小数
     private static final Pattern PIPE_PATTERN = Pattern.compile(
@@ -48,9 +46,8 @@ public class OutboundPipelineAnalyzer {
 
     private final List<TagData> pipeInfos = new ArrayList<>();
     private final List<TagData> flangeInfos = new ArrayList<>();
-    private final ObjectMapper objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-    public boolean executeAnalysis(String filePath) {
+    public List<CadItem> executeAnalysis(String filePath) {
         try {
             if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
                 processRemoteZip(filePath);
@@ -59,10 +56,11 @@ public class OutboundPipelineAnalyzer {
             } else {
                 processDXFFile(filePath);
             }
-            return true;
+
+            return this.generateSummary();
         } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+            log.error("出地管文件分析失败", e);
+            return Collections.emptyList();
         }
     }
 
@@ -75,7 +73,7 @@ public class OutboundPipelineAnalyzer {
         connection.setRequestMethod("GET");
 
         try (InputStream is = connection.getInputStream()) {
-            Path tempDir = Files.createTempDirectory("cad_outbound_pipeline");
+            Path tempDir = Files.createTempDirectory("cad_outbound_pipe");
             Path tempZip = Files.createTempFile("temp", ".zip");
             Files.copy(is, tempZip, StandardCopyOption.REPLACE_EXISTING);
             ZipFileUtils.unzip(tempZip.toString(), tempDir.toString());
@@ -195,7 +193,7 @@ public class OutboundPipelineAnalyzer {
         }
     }
 
-    public List<CadItem> generateSummary() {
+    private List<CadItem> generateSummary() {
         List<TagData> dataList = new ArrayList<>();
         dataList.addAll(pipeInfos);
         dataList.addAll(flangeInfos);
@@ -225,15 +223,11 @@ public class OutboundPipelineAnalyzer {
 
     public static void main(String[] args) throws Exception {
         // 支持 HTTP/ZIP/DXF
-        OutboundPipelineAnalyzer extractor = new OutboundPipelineAnalyzer();
+        OutboundPipeAnalyzer extractor = new OutboundPipeAnalyzer();
 //        String path = "D:\\1津都雅苑-出地管道.dxf";
 //        String path = "D:\\cad_file2.zip";
         String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file2.zip";
-
-        if (extractor.executeAnalysis(path)) {
-            log.info("汇总数据: " + extractor.generateSummary());
-        } else {
-            log.info("分析失败");
-        }
+        List<CadItem> cadItems = extractor.executeAnalysis(path);
+        log.info("汇总数据: " + cadItems);
     }
 }

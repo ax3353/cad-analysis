@@ -24,12 +24,50 @@ import java.util.stream.Collectors;
  * 楼栋管道分析
  */
 @Slf4j
-public class BuildingPipelineAnalyzer {
+public class BuildingPipeAnalyzer {
 
     // 正则表达式和关键字配置
     private final String regex = "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)";
     private final Pattern layerPattern = Pattern.compile(regex);
     private final List<String> keywords = Arrays.asList("高位挂表", "低位挂表");
+
+    /**
+     * 计算D48.3管子的总长度
+     */
+    public CadItem executeAnalysis(String zipPath) {
+        try {
+            Path tempDir = Files.createTempDirectory("building_pipe");
+            ZipFileUtils.unzip(zipPath, tempDir.toString());
+
+            List<String> dxfFiles = Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
+                            && p.getFileName().toString().startsWith("楼栋"))
+                    .map(Path::toString).collect(Collectors.toList());
+            if (dxfFiles.isEmpty()) {
+                log.info("未找到DXF文件");
+                return createResult(BigDecimal.ZERO);
+            }
+
+            double totalLength = dxfFiles.stream().mapToDouble(this::processDxfFile).sum();
+
+            if (Files.exists(tempDir)) {
+                try {
+                    Files.walk(tempDir)
+                            // 逆序遍历，先删文件再删目录
+                            .sorted(Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                    log.info("成功删除临时目录: {}", tempDir);
+                } catch (IOException e) {
+                    log.warn("删除临时目录: {} 失败", tempDir, e);
+                }
+            }
+
+            return createResult(BigDecimal.valueOf(totalLength));
+        } catch (IOException e) {
+            System.err.println("ZIP处理失败: " + e.getMessage());
+            return createResult(BigDecimal.ZERO);
+        }
+    }
 
     // 解析 DXF 文件
     private Map.Entry<Integer, Map<String, Integer>> analyzeDxfTexts(String dxfPath) {
@@ -141,44 +179,6 @@ public class BuildingPipelineAnalyzer {
         }
     }
 
-    /**
-     * 计算D48.3管子的总长度
-     */
-    public CadItem calcTotalLength(String zipPath) {
-        try {
-            Path tempDir = Files.createTempDirectory("building_pipieline");
-            ZipFileUtils.unzip(zipPath, tempDir.toString());
-
-            List<String> dxfFiles = Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
-                            && p.getFileName().toString().startsWith("楼栋"))
-                    .map(Path::toString).collect(Collectors.toList());
-            if (dxfFiles.isEmpty()) {
-                log.info("未找到DXF文件");
-                return createResult(BigDecimal.ZERO);
-            }
-
-            double totalLength = dxfFiles.stream().mapToDouble(this::processDxfFile).sum();
-
-            if (Files.exists(tempDir)) {
-                try {
-                    Files.walk(tempDir)
-                            // 逆序遍历，先删文件再删目录
-                            .sorted(Comparator.reverseOrder())
-                            .map(Path::toFile)
-                            .forEach(File::delete);
-                    log.info("成功删除临时目录: {}", tempDir);
-                } catch (IOException e) {
-                    log.warn("删除临时目录: {} 失败", tempDir, e);
-                }
-            }
-
-            return createResult(BigDecimal.valueOf(totalLength));
-        } catch (IOException e) {
-            System.err.println("ZIP处理失败: " + e.getMessage());
-            return createResult(BigDecimal.ZERO);
-        }
-    }
-
     private CadItem createResult(BigDecimal data) {
         CadItem item = new CadItem();
         item.setAlias("D48.3*4");
@@ -190,8 +190,8 @@ public class BuildingPipelineAnalyzer {
     }
 
     public static void main(String[] args) {
-        BuildingPipelineAnalyzer analyzer = new BuildingPipelineAnalyzer();
-        CadItem result = analyzer.calcTotalLength("d:\\cad_file2.zip");
+        BuildingPipeAnalyzer analyzer = new BuildingPipeAnalyzer();
+        CadItem result = analyzer.executeAnalysis("d:\\cad_file2.zip");
         System.out.println(result);
 
 //        String text = " 二十层 "
