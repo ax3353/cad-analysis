@@ -64,7 +64,7 @@ public class ReportController {
 
             // 3. 解析建筑管道数据
             BuildingPipelineAnalyzer analyzer = new BuildingPipelineAnalyzer();
-            Map<String, String> buildingData = analyzer.calcTotalLength(cadZipFileAbsPath);
+            Map<String, Object> buildingData = analyzer.calcTotalLength(cadZipFileAbsPath);
             List<Map<String, Object>> buildingPipeData = convertBuildingData(buildingData);
 
             // 4. 合并出地管和建筑管道数据
@@ -78,10 +78,10 @@ public class ReportController {
             }
 
             // 6. 返回结果
-            log.info("完成CAD图纸识别");
-            return JSON.toJSONString(mergedData);
+            String jsonString = JSON.toJSONString(mergedData);
+            log.info("完成CAD图纸识别，返回结果: {}", jsonString);
+            return jsonString;
         } catch (Exception e) {
-            e.printStackTrace();
             return "处理失败: " + e.getMessage();
         } finally {
             // 清理临时文件
@@ -111,31 +111,41 @@ public class ReportController {
         return tempFile;
     }
 
-    private File downloadToTempFileEnhance(String url) throws IOException {
+    private File downloadToTempFileEnhance(String url) {
         if (!StringUtils.hasText(url)) {
             return null;
         }
 
         String fileName = url.substring(url.lastIndexOf("/"));
-        File dest = Paths.get(uploadPath, "files", fileName).toFile();
-        if (dest.exists()) {
-            return dest;
-        } else {
-            return downloadToTempFile(url);
+        File dest;
+        try {
+            dest = Paths.get(uploadPath, "files", fileName).toFile();
+            if (dest.exists()) {
+                return dest;
+            } else {
+                return downloadToTempFile(url);
+            }
+        } catch (Exception e) {
+            log.error("下载文件失败", e);
+            return null;
         }
     }
 
-    private List<Map<String, Object>> convertBuildingData(Map<String, String> data) {
+    private List<Map<String, Object>> convertBuildingData(Map<String, Object> data) {
         Map<String, Object> item = new HashMap<>();
         item.put("type", data.get("type"));
         item.put("spec", data.get("spec"));
         item.put("alias", data.get("alias"));
-        item.put("data", new BigDecimal(data.get("data")));
+        item.put("data", data.get("data"));
         item.put("unit", data.get("unit"));
         return Collections.singletonList(item);
     }
 
     private List<Map<String, Object>> excelToJson(File excelFile) throws IOException {
+        if (excelFile == null) {
+            return new ArrayList<>();
+        }
+
         Workbook workbook = WorkbookFactory.create(excelFile);
         Sheet sheet = workbook.getSheetAt(0);
         List<Map<String, Object>> result = new ArrayList<>();

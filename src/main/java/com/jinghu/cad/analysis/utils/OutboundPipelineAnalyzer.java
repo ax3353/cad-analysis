@@ -26,8 +26,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 /**
  * 出地管和法兰分析
@@ -53,7 +51,6 @@ public class OutboundPipelineAnalyzer {
     private final List<TagData> pipeInfos = new ArrayList<>();
     private final List<TagData> flangeInfos = new ArrayList<>();
     private final ObjectMapper objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
-    private final List<String> errorLog = new ArrayList<>();
 
     public boolean executeAnalysis(String filePath) {
         try {
@@ -66,75 +63,41 @@ public class OutboundPipelineAnalyzer {
             }
             return true;
         } catch (Exception e) {
-            errorLog.add("文件解析异常: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
 
+    /**
+     * 远程文件，如：http://www.qq.com/test.zip
+     */
     private void processRemoteZip(String urlString) throws Exception {
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
 
         try (InputStream is = connection.getInputStream()) {
-            Path tempDir = Files.createTempDirectory("cad_extractor");
-            unzip(is, tempDir);
-            processExtractedFiles(tempDir);
+            Path tempDir = Files.createTempDirectory("cad_outbound_pipeline");
+            Path tempZip = Files.createTempFile("temp", ".zip");
+            Files.copy(is, tempZip, StandardCopyOption.REPLACE_EXISTING);
+            ZipFileUtils.unzip(tempZip.toString(), tempDir.toString());
+            Files.deleteIfExists(tempZip);
+            processDXFFiles(tempDir);
         }
     }
 
+    /**
+     * 本地文件，如：D:\test.zip
+     */
     private void processLocalZip(String zipPath) throws Exception {
-        Path tempDir = Files.createTempDirectory("cad_extractor");
-        try (ZipFile zipFile = new ZipFile(zipPath)) {
-            unzip(zipFile, tempDir);
-            processExtractedFiles(tempDir);
-        }
+        Path tempDir = Files.createTempDirectory("cad_outbound_pipeline");
+        ZipFileUtils.unzip(zipPath, tempDir.toString());
+        processDXFFiles(tempDir);
     }
 
-    private void unzip(InputStream is, Path outputDir) throws IOException {
-        Path tempZip = Files.createTempFile("temp", ".zip");
-        Files.copy(is, tempZip, StandardCopyOption.REPLACE_EXISTING);
-        try (ZipFile zipFile = new ZipFile(tempZip.toFile())) {
-            unzip(zipFile, outputDir);
-        }
-        Files.deleteIfExists(tempZip);
-    }
-
-    private void unzip(ZipFile zipFile, Path outputDir) throws IOException {
-        Enumeration<? extends ZipEntry> entries = zipFile.entries();
-        while (entries.hasMoreElements()) {
-            ZipEntry entry = entries.nextElement();
-            Path entryPath = outputDir.resolve(entry.getName());
-            if (entry.isDirectory()) {
-                Files.createDirectories(entryPath);
-            } else {
-                Files.createDirectories(entryPath.getParent());
-                try (InputStream is = zipFile.getInputStream(entry)) {
-                    Files.copy(is, entryPath, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        }
-    }
-
-    private void processExtractedFiles(Path tmpDir) throws IOException {
-        Files.walk(tmpDir)
-                .filter(p -> p.getFileName().toString().equals("Drawing0.dxf"))
-                .forEach(p -> processDXFFile(p.toString()));
-
-        // 删除临时文件
-        if (Files.exists(tmpDir)) {
-            try {
-                Files.walk(tmpDir)
-                        .map(Path::toFile)
-                        .sorted((o1, o2) -> -o1.compareTo(o2))
-                        .forEach(File::delete);
-                log.info("删除临时目录: {}", tmpDir.getFileName());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
+    /**
+     * 本地DXF文件，如：D:\test.dxf
+     */
     private void processDXFFile(String dxfPath) {
         try {
             Parser parser = ParserBuilder.createDefaultParser();
@@ -144,7 +107,27 @@ public class OutboundPipelineAnalyzer {
                 processDXFDocument(doc);
             }
         } catch (Exception e) {
-            errorLog.add("DXF处理失败: " + dxfPath + " - " + e.getMessage());
+            log.error("DXF处理失败: " + dxfPath + " - " + e.getMessage());
+        }
+    }
+
+    private void processDXFFiles(Path tempDir) throws IOException {
+        Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
+                        && p.getFileName().toString().startsWith("出地管"))
+                .forEach(p -> processDXFFile(p.toString()));
+
+        // 删除临时文件
+        if (Files.exists(tempDir)) {
+            try {
+                Files.walk(tempDir)
+                        // 逆序遍历，先删文件再删目录
+                        .sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+                log.info("成功删除临时目录: {}", tempDir);
+            } catch (IOException e) {
+                log.warn("删除临时目录: {} 失败", tempDir, e);
+            }
         }
     }
 
@@ -210,7 +193,7 @@ public class OutboundPipelineAnalyzer {
                 ));
             }
         } catch (Exception e) {
-            errorLog.add("文本解析异常: " + text.getText() + " - " + e.getMessage());
+            log.error("文本解析异常: " + text.getText() + " - " + e.getMessage());
         }
     }
 
@@ -241,11 +224,6 @@ public class OutboundPipelineAnalyzer {
         return objectMapper.writeValueAsString(result);
     }
 
-
-    public String getErrorLog() {
-        return errorLog.isEmpty() ? "无错误记录" : String.join("\n", errorLog);
-    }
-
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
@@ -264,15 +242,13 @@ public class OutboundPipelineAnalyzer {
         // 支持 HTTP/ZIP/DXF
         OutboundPipelineAnalyzer extractor = new OutboundPipelineAnalyzer();
 //        String path = "D:\\1津都雅苑-出地管道.dxf";
-        String path = "D:\\cad_file2.zip";
-//        String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file2.zip";
+//        String path = "D:\\cad_file2.zip";
+        String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file2.zip";
 
         if (extractor.executeAnalysis(path)) {
             log.info("汇总数据: " + extractor.generateSummaryJson());
         } else {
             log.info("分析失败");
         }
-
-        log.info("错误日志: " + extractor.getErrorLog());
     }
 }

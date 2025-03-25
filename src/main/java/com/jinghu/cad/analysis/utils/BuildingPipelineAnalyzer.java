@@ -12,17 +12,12 @@ import org.kabeja.parser.ParserBuilder;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.net.URI;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 /**
  * 楼栋管道分析
@@ -145,69 +140,46 @@ public class BuildingPipelineAnalyzer {
         }
     }
 
-    // 处理 ZIP 文件（优化解压逻辑）
-    public Map<String, String> calcTotalLength(String zipPath) {
+    /**
+     * 计算D48.3管子的总长度
+     */
+    public Map<String, Object> calcTotalLength(String zipPath) {
         try {
-            Path tempDir = Files.createTempDirectory("dxf_analyzer");
-            unzip(zipPath, tempDir.toString());
+            Path tempDir = Files.createTempDirectory("building_pipieline");
+            ZipFileUtils.unzip(zipPath, tempDir.toString());
 
-            List<String> dxfFiles = findDxfFiles(tempDir);
+            List<String> dxfFiles = Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
+                            && p.getFileName().toString().startsWith("楼栋"))
+                    .map(Path::toString).collect(Collectors.toList());
             if (dxfFiles.isEmpty()) {
                 log.info("未找到DXF文件");
-                return createResult("0");
+                return createResult(0.0d);
             }
 
             double totalLength = dxfFiles.stream().mapToDouble(this::processDxfFile).sum();
 
-            // 删除临时文件
             if (Files.exists(tempDir)) {
                 try {
                     Files.walk(tempDir)
+                            // 逆序遍历，先删文件再删目录
+                            .sorted(Comparator.reverseOrder())
                             .map(Path::toFile)
-                            .sorted((o1, o2) -> -o1.compareTo(o2))
                             .forEach(File::delete);
-                    log.info("删除临时目录: {}", tempDir.getFileName());
+                    log.info("成功删除临时目录: {}", tempDir);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.warn("删除临时目录: {} 失败", tempDir, e);
                 }
             }
 
-            return createResult(String.valueOf(totalLength));
+            return createResult(totalLength);
         } catch (IOException e) {
             System.err.println("ZIP处理失败: " + e.getMessage());
-            return createResult("0");
+            return createResult(0.0d);
         }
     }
 
-    // 解压 ZIP（优化临时文件清理）
-    private void unzip(String zipPath, String outputDir) throws IOException {
-        try (ZipFile zipFile = new ZipFile(zipPath)) {
-            Enumeration<? extends ZipEntry> entries = zipFile.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry entry = entries.nextElement();
-                Path entryPath = Paths.get(outputDir, entry.getName());
-                Files.createDirectories(entryPath.getParent());
-                if (!entry.isDirectory()) {
-                    try (InputStream is = zipFile.getInputStream(entry)) {
-                        Files.copy(is, entryPath, StandardCopyOption.REPLACE_EXISTING);
-                    }
-                }
-            }
-        }
-    }
-
-    // 查找 DXF 文件（保留过滤条件）
-    private List<String> findDxfFiles(Path dir) throws IOException {
-        try (Stream<Path> paths = Files.walk(dir)) {
-            return paths.filter(p -> p.toString().endsWith(".dxf") &&
-                            !p.getFileName().toString().startsWith("Drawing0"))
-                    .map(Path::toString)
-                    .collect(Collectors.toList());
-        }
-    }
-
-    private Map<String, String> createResult(String data) {
-        Map<String, String> result = new HashMap<>();
+    private Map<String, Object> createResult(Double data) {
+        Map<String, Object> result = new HashMap<>();
         result.put("type", "管道");
         result.put("spec", "D48.3");
         result.put("alias", "D48.3*4");
@@ -218,7 +190,7 @@ public class BuildingPipelineAnalyzer {
 
     public static void main(String[] args) {
         BuildingPipelineAnalyzer analyzer = new BuildingPipelineAnalyzer();
-        Map<String, String> result = analyzer.calcTotalLength("d:\\cad_file2.zip");
+        Map<String, Object> result = analyzer.calcTotalLength("d:\\cad_file2.zip");
         System.out.println(result);
 
 //        String text = " 二十层 "
