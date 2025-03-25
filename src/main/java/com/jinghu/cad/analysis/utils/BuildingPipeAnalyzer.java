@@ -3,20 +3,23 @@ package com.jinghu.cad.analysis.utils;
 
 import com.jinghu.cad.analysis.pojo.CadItem;
 import lombok.extern.slf4j.Slf4j;
-import org.kabeja.dxf.DXFDocument;
-import org.kabeja.dxf.DXFEntity;
-import org.kabeja.dxf.DXFLayer;
-import org.kabeja.dxf.DXFText;
+import org.kabeja.dxf.*;
 import org.kabeja.parser.Parser;
 import org.kabeja.parser.ParserBuilder;
+import org.springframework.util.StringUtils;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -26,173 +29,201 @@ import java.util.stream.Collectors;
 @Slf4j
 public class BuildingPipeAnalyzer {
 
-    // 正则表达式和关键字配置
-    private final String regex = "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)";
-    private final Pattern layerPattern = Pattern.compile(regex);
-    private final List<String> keywords = Arrays.asList("高位挂表", "低位挂表");
+    // 层正则
+    private static final Pattern FLOOR_PATTERN = Pattern.compile(
+            "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)",
+            Pattern.CASE_INSENSITIVE);
 
-    /**
-     * 计算D48.3管子的总长度
-     */
-    public CadItem executeAnalysis(String zipPath) {
+    // 管子正则
+    private static final Pattern THICKNESS_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)"); // 匹配整数或小数
+    private static final Pattern PIPE_PATTERN = Pattern.compile(
+            "^" +                                  // 锚定字符串开始
+                    "(D(?:N?\\d+(?:\\.\\d+)?))" +         // 组1: 直径（如 D48.3）
+                    "[-x×]" +                             // 分隔符（如 x）
+                    "(?:" + THICKNESS_PATTERN.pattern() + "[-x×])?" + // 组2（可选）: 厚度（如 4）
+                    "(\\d+(?:\\.\\d+)?)" +                // 组3: 长度（如 1.2）
+                    "[mM]" +                              // 后缀 m/M
+                    "$",                                  // 锚定字符串结束
+            Pattern.CASE_INSENSITIVE
+    );
+
+    private final List<CadItem> pipeInfos = new ArrayList<>();
+    private int floorCounts = 0;
+
+    public List<CadItem> executeAnalysis(String filePath) {
         try {
-            Path tempDir = Files.createTempDirectory("building_pipe");
-            ZipFileUtils.unzip(zipPath, tempDir.toString());
-
-            List<String> dxfFiles = Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
-                            && p.getFileName().toString().startsWith("楼栋"))
-                    .map(Path::toString).collect(Collectors.toList());
-            if (dxfFiles.isEmpty()) {
-                log.info("未找到DXF文件");
-                return createResult(BigDecimal.ZERO);
+            if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+                processRemoteZip(filePath);
+            } else if (filePath.endsWith(".zip")) {
+                processLocalZip(filePath);
+            } else {
+                processDXFFile(filePath);
             }
 
-            double totalLength = dxfFiles.stream().mapToDouble(this::processDxfFile).sum();
-
-            if (Files.exists(tempDir)) {
-                try {
-                    Files.walk(tempDir)
-                            // 逆序遍历，先删文件再删目录
-                            .sorted(Comparator.reverseOrder())
-                            .map(Path::toFile)
-                            .forEach(File::delete);
-                    log.info("成功删除临时目录: {}", tempDir);
-                } catch (IOException e) {
-                    log.warn("删除临时目录: {} 失败", tempDir, e);
-                }
-            }
-
-            return createResult(BigDecimal.valueOf(totalLength));
-        } catch (IOException e) {
-            System.err.println("ZIP处理失败: " + e.getMessage());
-            return createResult(BigDecimal.ZERO);
+            return this.generateSummary();
+        } catch (Exception e) {
+            log.error("出地管文件分析失败", e);
+            return Collections.emptyList();
         }
     }
 
-    // 解析 DXF 文件
-    private Map.Entry<Integer, Map<String, Integer>> analyzeDxfTexts(String dxfPath) {
-        Map<String, Integer> textCounts = new HashMap<>();
-        keywords.forEach(k -> textCounts.put(k, 0));
-        int layerCount = 0;
+    /**
+     * 远程文件，如：http://www.qq.com/test.zip
+     */
+    private void processRemoteZip(String urlString) throws Exception {
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
 
+        try (InputStream is = connection.getInputStream()) {
+            Path tempDir = Files.createTempDirectory("cad_outbound_pipe");
+            Path tempZip = Files.createTempFile("temp", ".zip");
+            Files.copy(is, tempZip, StandardCopyOption.REPLACE_EXISTING);
+            ZipFileUtils.unzip(tempZip.toString(), tempDir.toString());
+            Files.deleteIfExists(tempZip);
+            processDXFFiles(tempDir);
+        }
+    }
+
+    /**
+     * 本地文件，如：D:\test.zip
+     */
+    private void processLocalZip(String zipPath) throws Exception {
+        Path tempDir = Files.createTempDirectory("cad_outbound_pipeline");
+        ZipFileUtils.unzip(zipPath, tempDir.toString());
+        processDXFFiles(tempDir);
+    }
+
+    /**
+     * 本地DXF文件，如：D:\test.dxf
+     */
+    private void processDXFFile(String dxfPath) {
         try {
             Parser parser = ParserBuilder.createDefaultParser();
             try (FileInputStream fis = new FileInputStream(dxfPath)) {
                 parser.parse(fis, "UTF-8");
                 DXFDocument doc = parser.getDocument();
-
-                // 遍历所有图层
-                Iterator<DXFLayer> layerIter = doc.getDXFLayerIterator();
-                while (layerIter.hasNext()) {
-                    DXFLayer layer = layerIter.next();
-
-                    Iterator entityTypeIterator = layer.getDXFEntityTypeIterator();
-                    while (entityTypeIterator.hasNext()) {
-                        String entityType = (String) entityTypeIterator.next();
-                        if ("TEXT".equalsIgnoreCase(entityType)) {
-                            List<DXFEntity> entities = layer.getDXFEntities(entityType);
-                            for (DXFEntity entity : entities) {
-                                if (entity instanceof DXFText) {
-                                    DXFText text = (DXFText) entity;
-                                    String content = text.getText().trim().replaceAll("\\s+", "");
-
-                                    // 匹配层数
-                                    if (layerPattern.matcher(content).matches()) {
-                                        layerCount++;
-                                    }
-
-                                    // 统计关键字
-                                    keywords.forEach(k -> {
-                                        if (content.contains(k)) {
-                                            textCounts.put(k, textCounts.get(k) + 1);
-                                        }
-                                    });
-                                }
-                            }
-                        }
-                    }
-
-                }
+                processDXFDocument(doc);
             }
         } catch (Exception e) {
-            System.err.println("DXF解析失败: " + e.getMessage());
-        }
-
-        return new AbstractMap.SimpleEntry<>(layerCount > 0 ? layerCount : null, textCounts);
-    }
-
-    // 处理单个 DXF 文件（保留原有逻辑）
-    private double processDxfFile(String dxfFile) {
-        Map.Entry<Integer, Map<String, Integer>> result = analyzeDxfTexts(dxfFile);
-        Integer totalHouseholds = result.getKey();
-        Map<String, Integer> textCounts = result.getValue();
-
-        if (totalHouseholds == null) {
-            log.info("文件 {} 未找到楼层信息", dxfFile);
-            return 0;
-        }
-
-        log.info("【文件】: {}", dxfFile);
-        log.info("【总户数】: {}", totalHouseholds);
-
-        int low = textCounts.getOrDefault("低位挂表", 0);
-        int high = textCounts.getOrDefault("高位挂表", 0);
-        log.info("原始低位挂表: {}, 原始高位挂表: {}", low, high);
-
-        String category = determineCategory(low, high);
-        Map.Entry<Integer, Integer> clocks = calculateClocks(category, totalHouseholds, low, high);
-
-        double highClockMeter = 3.0d;
-        double lowClockMeter = 3.0d;
-        double totalLength = (clocks.getValue() * lowClockMeter) + (clocks.getKey() * highClockMeter);
-        log.info("【总长度】: {}米\n", totalLength);
-        return totalLength;
-    }
-
-    private String determineCategory(int low, int high) {
-        if (low == 0 || high == 0) {
-            return "A";
-        } else if (low == high) {
-            return "B";
-        } else {
-            return "C";
+            log.error("DXF处理失败: " + dxfPath + " - " + e.getMessage());
         }
     }
 
-    private Map.Entry<Integer, Integer> calculateClocks(String category, int total, int low, int high) {
-        switch (category) {
-            case "A":
-                if (low == 0) {
-                    log.info("户数转高位挂表={}, 户数转低位挂表=0", total);
-                    return new AbstractMap.SimpleEntry<>(total, 0);
-                } else {
-                    log.info("户数转低位挂表={}, 户数转高位挂表=0", total);
-                    return new AbstractMap.SimpleEntry<>(0, total);
+    private void processDXFFiles(Path tempDir) throws IOException {
+        Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
+                        && p.getFileName().toString().startsWith("出地管"))
+                .forEach(p -> processDXFFile(p.toString()));
+
+        // 删除临时文件
+        if (Files.exists(tempDir)) {
+            try {
+                Files.walk(tempDir)
+                        // 逆序遍历，先删文件再删目录
+                        .sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+                log.info("成功删除临时目录: {}", tempDir);
+            } catch (IOException e) {
+                log.warn("删除临时目录: {} 失败", tempDir, e);
+            }
+        }
+    }
+
+    private void processDXFDocument(DXFDocument doc) {
+        Iterator layerIterator = doc.getDXFLayerIterator();
+        while (layerIterator.hasNext()) {
+            DXFLayer layer = (DXFLayer) layerIterator.next();
+            processLayerEntities(layer);
+        }
+    }
+
+    private void processLayerEntities(DXFLayer layer) {
+        Iterator entityTypeIterator = layer.getDXFEntityTypeIterator();
+        while (entityTypeIterator.hasNext()) {
+            String entityType = (String) entityTypeIterator.next();
+            if ("TEXT".equalsIgnoreCase(entityType) || "MTEXT".equalsIgnoreCase(entityType)) {
+                List<DXFEntity> entities = layer.getDXFEntities(entityType);
+                for (DXFEntity entity : entities) {
+                    if (entity instanceof DXFText) {
+                        processTextEntity((DXFText) entity);
+                    }
+                    if (entity instanceof DXFMText) {
+                        processTextEntity((DXFMText) entity);
+                    }
                 }
-            case "B":
-                int half = total / 2;
-                log.info("户数转低位挂表={}, 户数转高位挂表={}", half, half);
-                return new AbstractMap.SimpleEntry<>(half, half);
-            default:
-                log.info("户型分散，无法分配");
-                return new AbstractMap.SimpleEntry<>(0, 0);
+            }
         }
     }
 
-    private CadItem createResult(BigDecimal data) {
-        CadItem item = new CadItem();
-        item.setAlias("D48.3*4");
-        item.setType("管道");
-        item.setSpec("D48.3");
-        item.setNominalSpec("DN40");
-        item.setData(data);
-        item.setUnit("m");
-        return item;
+    private void processTextEntity(DXFText text) {
+        try {
+            String currentText = text.getText().trim().replaceAll("\\s+", "");
+            Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
+            Matcher floorMatcher = FLOOR_PATTERN.matcher(currentText);
+
+            if (pipeMatcher.find()) {
+                String spec = pipeMatcher.group(1).toUpperCase();
+                String groupAlias = pipeMatcher.group(2);
+                String alias = spec;
+                if (StringUtils.hasText(groupAlias)) {
+                    alias = spec + "*" + groupAlias;
+                }
+                BigDecimal length = new BigDecimal(pipeMatcher.group(3));
+
+                CadItem item = new CadItem();
+                item.setAlias(alias);
+                item.setUnit("m");
+                item.setType("管道");
+                item.setData(length);
+                item.setSpec(spec);
+                item.setNominalSpec(spec);
+                pipeInfos.add(item);
+            } else if (floorMatcher.find()) {
+                floorCounts++;
+            }
+        } catch (Exception e) {
+            log.error("文本解析异常: " + text.getText() + " - " + e.getMessage());
+        }
+    }
+
+    private List<CadItem> generateSummary() {
+        // 按 alias 和 spec 共同分组
+        Map<String, List<CadItem>> grouped = pipeInfos.stream()
+                .collect(Collectors.groupingBy(tag -> tag.getAlias() + "|" + tag.getSpec()));
+
+        List<CadItem> result = new ArrayList<>();
+        for (Map.Entry<String, List<CadItem>> entry : grouped.entrySet()) {
+            List<CadItem> items = entry.getValue();
+            String[] keys = entry.getKey().split("\\|");
+
+            CadItem item = new CadItem();
+            item.setAlias(keys[0]);
+            item.setSpec(keys[1]);
+            item.setNominalSpec(keys[1]);
+            item.setType(items.get(0).getType());
+            item.setUnit(items.get(0).getUnit());
+            item.setData(items.stream()
+                    .map(CadItem::getData)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+            result.add(item);
+        }
+
+        CadItem floorItem = new CadItem();
+        floorItem.setAlias("层数");
+        floorItem.setUnit("层");
+        floorItem.setType("楼层数");
+        floorItem.setData(BigDecimal.valueOf(floorCounts));
+        floorItem.setSpec("层");
+        floorItem.setNominalSpec("层");
+        result.add(floorItem);
+
+        return result;
     }
 
     public static void main(String[] args) {
         BuildingPipeAnalyzer analyzer = new BuildingPipeAnalyzer();
-        CadItem result = analyzer.executeAnalysis("d:\\cad_file2.zip");
+        List<CadItem> result = analyzer.executeAnalysis("d:\\cad_file2.zip");
         System.out.println(result);
 
 //        String text = " 二十层 "

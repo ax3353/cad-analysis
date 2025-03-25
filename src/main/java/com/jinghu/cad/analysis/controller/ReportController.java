@@ -61,8 +61,7 @@ public class ReportController {
 
             // 3. 解析建筑管道数据
             BuildingPipeAnalyzer buildingPipeAnalyzer = new BuildingPipeAnalyzer();
-            CadItem buildingData = buildingPipeAnalyzer.executeAnalysis(cadZipFileAbsPath);
-            List<CadItem> buildingPipeData = Collections.singletonList(buildingData);
+            List<CadItem> buildingPipeData = buildingPipeAnalyzer.executeAnalysis(cadZipFileAbsPath);
 
             // 4. 合并出地管和建筑管道数据
             List<CadItem> mergedData = mergeData(outboundPipeData, buildingPipeData);
