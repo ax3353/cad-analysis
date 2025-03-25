@@ -18,16 +18,13 @@ public class CadItem {
 
     private BigDecimal data;
 
+    /**
+     * 原规格
+     */
     private String spec;
 
-    @Override
-    public String toString() {
-        return "Item{" +
-                "alias='" + alias + '\'' +
-                ", unit='" + unit + '\'' +
-                ", type='" + type + '\'' +
-                ", data=" + data +
-                ", spec='" + spec + '\'' +
-                '}';
-    }
+    /**
+     * 公制原规格
+     */
+    private String nominalSpec;
 }

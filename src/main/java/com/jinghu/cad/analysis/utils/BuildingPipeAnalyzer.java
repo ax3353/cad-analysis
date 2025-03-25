@@ -184,6 +184,7 @@ public class BuildingPipeAnalyzer {
         item.setAlias("D48.3*4");
         item.setType("管道");
         item.setSpec("D48.3");
+        item.setNominalSpec("DN40");
         item.setData(data);
         item.setUnit("m");
         return item;

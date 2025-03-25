@@ -1,7 +1,6 @@
 package com.jinghu.cad.analysis.utils;
 
 import com.jinghu.cad.analysis.pojo.CadItem;
-import com.jinghu.cad.analysis.pojo.TagData;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
 import org.kabeja.parser.Parser;
@@ -44,8 +43,8 @@ public class OutboundPipeAnalyzer {
                     "(?!.*\\d+\\s*[m米])"; // 排除含长度单位的情况
     private static final Pattern FLANGE_PATTERN = Pattern.compile(REGEX, Pattern.CASE_INSENSITIVE);
 
-    private final List<TagData> pipeInfos = new ArrayList<>();
-    private final List<TagData> flangeInfos = new ArrayList<>();
+    private final List<CadItem> pipeInfos = new ArrayList<>();
+    private final List<CadItem> flangeInfos = new ArrayList<>();
 
     public List<CadItem> executeAnalysis(String filePath) {
         try {
@@ -143,17 +142,17 @@ public class OutboundPipeAnalyzer {
                 List<DXFEntity> entities = layer.getDXFEntities(entityType);
                 for (DXFEntity entity : entities) {
                     if (entity instanceof DXFText) {
-                        processTextEntity((DXFText) entity, layer.getName());
+                        processTextEntity((DXFText) entity);
                     }
                     if (entity instanceof DXFMText) {
-                        processTextEntity((DXFMText) entity, layer.getName());
+                        processTextEntity((DXFMText) entity);
                     }
                 }
             }
         }
     }
 
-    private void processTextEntity(DXFText text, String layerName) {
+    private void processTextEntity(DXFText text) {
         try {
             String currentText = text.getText().trim().replaceAll("\\s+", "");
             Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
@@ -167,26 +166,24 @@ public class OutboundPipeAnalyzer {
                     alias = spec + "*" + groupAlias;
                 }
                 BigDecimal length = new BigDecimal(pipeMatcher.group(3));
-                pipeInfos.add(new TagData(
-                        text.getID(),
-                        layerName,
-                        "管道",
-                        spec,
-                        alias,
-                        currentText,
-                        length,
-                        "m"));
+
+                CadItem item = new CadItem();
+                item.setAlias(alias);
+                item.setUnit("m");
+                item.setType("管道");
+                item.setData(length);
+                item.setSpec(spec);
+                item.setNominalSpec(spec);
+                pipeInfos.add(item);
             } else if (flangeMatcher.find()) {
-                flangeInfos.add(new TagData(
-                        text.getID(),
-                        layerName,
-                        "法兰",
-                        flangeMatcher.group(1),
-                        flangeMatcher.group(2).toUpperCase(),
-                        currentText,
-                        new BigDecimal(1),
-                        "个"
-                ));
+                CadItem item = new CadItem();
+                item.setAlias(flangeMatcher.group(1));
+                item.setUnit("个");
+                item.setType("法兰");
+                item.setData(new BigDecimal(1));
+                item.setSpec(flangeMatcher.group(2).toUpperCase());
+                item.setNominalSpec(item.getSpec());
+                pipeInfos.add(item);
             }
         } catch (Exception e) {
             log.error("文本解析异常: " + text.getText() + " - " + e.getMessage());
@@ -194,26 +191,27 @@ public class OutboundPipeAnalyzer {
     }
 
     private List<CadItem> generateSummary() {
-        List<TagData> dataList = new ArrayList<>();
+        List<CadItem> dataList = new ArrayList<>();
         dataList.addAll(pipeInfos);
         dataList.addAll(flangeInfos);
 
         // 按 alias 和 spec 共同分组
-        Map<String, List<TagData>> grouped = dataList.stream()
+        Map<String, List<CadItem>> grouped = dataList.stream()
                 .collect(Collectors.groupingBy(tag -> tag.getAlias() + "|" + tag.getSpec()));
 
         List<CadItem> result = new ArrayList<>();
-        for (Map.Entry<String, List<TagData>> entry : grouped.entrySet()) {
-            List<TagData> items = entry.getValue();
+        for (Map.Entry<String, List<CadItem>> entry : grouped.entrySet()) {
+            List<CadItem> items = entry.getValue();
             String[] keys = entry.getKey().split("\\|");
 
             CadItem item = new CadItem();
             item.setAlias(keys[0]);
             item.setSpec(keys[1]);
+            item.setNominalSpec(keys[1]);
             item.setType(items.get(0).getType());
             item.setUnit(items.get(0).getUnit());
             item.setData(items.stream()
-                    .map(TagData::getData)
+                    .map(CadItem::getData)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
 
             result.add(item);

@@ -1,6 +1,7 @@
 package com.jinghu.cad.analysis.controller;
 
 import com.alibaba.fastjson.JSON;
+import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import com.jinghu.cad.analysis.req.ReportRequest;
 import com.jinghu.cad.analysis.utils.BuildingPipeAnalyzer;
@@ -73,13 +74,16 @@ public class ReportController {
                 mergedData = mergeData(supplementData, mergedData);
             }
 
-            // 6. 合并工程量确认单
+            // 6. 公制转换
+            this.convertNominalSpec(mergedData);
+
+            // 7. 合并工程量确认单
             if (StringUtils.hasText(confirmFileUrl)) {
                 confirmFile = downloadToTempFileEnhance(confirmFileUrl);
                 // todo
             }
 
-            // 7. 返回结果
+            // 8. 返回结果
             String jsonString = JSON.toJSONString(mergedData);
             log.info("完成CAD图纸识别，返回结果: {}", jsonString);
             return jsonString;
@@ -104,6 +108,7 @@ public class ReportController {
         try {
             dest = Paths.get(uploadPath, "files", fileName).toFile();
             if (dest.exists()) {
+                log.info("文件 {} 已存在跳过下载", dest.getAbsolutePath());
                 return dest;
             } else {
                 return downloadToTempFile(url);
@@ -151,6 +156,7 @@ public class ReportController {
             CadItem item = new CadItem();
             item.setType(getCellStringValue(row.getCell(0)));
             item.setSpec(getCellStringValue(row.getCell(1)));
+            item.setNominalSpec(getCellStringValue(row.getCell(1)));
             item.setAlias(getCellStringValue(row.getCell(2)));
             item.setData(convertCellToBigDecimal(row.getCell(3)));
             item.setUnit(getCellStringValue(row.getCell(4)));
@@ -203,12 +209,39 @@ public class ReportController {
                 newItem.setType(item.getType());
                 newItem.setData(item.getData());
                 newItem.setSpec(item.getSpec());
+                newItem.setNominalSpec(item.getSpec());
                 merged.put(key, newItem);
             }
         });
 
         // 将 Map 转换为 List<CadItem> 返回
         return new ArrayList<>(merged.values());
+    }
+
+    private void convertNominalSpec(List<CadItem> items) {
+        for (CadItem item : items) {
+            String upperCaseSpec = item.getSpec().toUpperCase();
+            // 如果本身是公制则原规格等于公制
+            if (upperCaseSpec.startsWith("DN")) {
+                item.setNominalSpec(item.getSpec());
+                continue;
+            }
+
+            // 尝试转换
+            for (PipeDiameter diameter : PipeDiameter.values()) {
+                // 尝试匹配美制
+                if (diameter.getSeriesAOuterDiameterAlias().equals(upperCaseSpec)) {
+                    item.setNominalSpec(diameter.getNominalDiameterAlias());
+                    break;
+                }
+
+                // 尝试匹配欧制
+                if (diameter.getSeriesBOuterDiameterAlias().equals(upperCaseSpec)) {
+                    item.setNominalSpec(diameter.getNominalDiameterAlias());
+                    break;
+                }
+            }
+        }
     }
 
     private void deleteTempFile(File file) {
