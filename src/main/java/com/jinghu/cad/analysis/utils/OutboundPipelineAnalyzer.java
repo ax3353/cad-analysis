@@ -1,11 +1,9 @@
 package com.jinghu.cad.analysis.utils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.jinghu.cad.analysis.pojo.CadItem;
+import com.jinghu.cad.analysis.pojo.TagData;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
 import org.kabeja.parser.Parser;
@@ -197,7 +195,7 @@ public class OutboundPipelineAnalyzer {
         }
     }
 
-    public String generateSummaryJson() throws JsonProcessingException {
+    public List<CadItem> generateSummary() {
         List<TagData> dataList = new ArrayList<>();
         dataList.addAll(pipeInfos);
         dataList.addAll(flangeInfos);
@@ -206,36 +204,23 @@ public class OutboundPipelineAnalyzer {
         Map<String, List<TagData>> grouped = dataList.stream()
                 .collect(Collectors.groupingBy(tag -> tag.getAlias() + "|" + tag.getSpec()));
 
-        List<Map<String, Object>> result = new ArrayList<>();
+        List<CadItem> result = new ArrayList<>();
         for (Map.Entry<String, List<TagData>> entry : grouped.entrySet()) {
             List<TagData> items = entry.getValue();
             String[] keys = entry.getKey().split("\\|");
 
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("alias", keys[0]); // alias
-            map.put("spec", keys[1]);  // spec
-            map.put("type", items.get(0).getType());
-            map.put("unit", items.get(0).getUnit());
-            map.put("data", items.stream()
+            CadItem item = new CadItem();
+            item.setAlias(keys[0]);
+            item.setSpec(keys[1]);
+            item.setType(items.get(0).getType());
+            item.setUnit(items.get(0).getUnit());
+            item.setData(items.stream()
                     .map(TagData::getData)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
-            result.add(map);
-        }
-        return objectMapper.writeValueAsString(result);
-    }
 
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class TagData {
-        private String cadId;
-        private String cadLayer;
-        private String type;
-        private String spec;
-        private String alias;
-        private String text;
-        private BigDecimal data;
-        private String unit;
+            result.add(item);
+        }
+        return result;
     }
 
     public static void main(String[] args) throws Exception {
@@ -246,7 +231,7 @@ public class OutboundPipelineAnalyzer {
         String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file2.zip";
 
         if (extractor.executeAnalysis(path)) {
-            log.info("汇总数据: " + extractor.generateSummaryJson());
+            log.info("汇总数据: " + extractor.generateSummary());
         } else {
             log.info("分析失败");
         }

@@ -1,6 +1,7 @@
 package com.jinghu.cad.analysis.utils;
 
 
+import com.jinghu.cad.analysis.pojo.CadItem;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.DXFDocument;
 import org.kabeja.dxf.DXFEntity;
@@ -12,9 +13,9 @@ import org.kabeja.parser.ParserBuilder;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.URI;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -143,7 +144,7 @@ public class BuildingPipelineAnalyzer {
     /**
      * 计算D48.3管子的总长度
      */
-    public Map<String, Object> calcTotalLength(String zipPath) {
+    public CadItem calcTotalLength(String zipPath) {
         try {
             Path tempDir = Files.createTempDirectory("building_pipieline");
             ZipFileUtils.unzip(zipPath, tempDir.toString());
@@ -153,7 +154,7 @@ public class BuildingPipelineAnalyzer {
                     .map(Path::toString).collect(Collectors.toList());
             if (dxfFiles.isEmpty()) {
                 log.info("未找到DXF文件");
-                return createResult(0.0d);
+                return createResult(BigDecimal.ZERO);
             }
 
             double totalLength = dxfFiles.stream().mapToDouble(this::processDxfFile).sum();
@@ -171,26 +172,26 @@ public class BuildingPipelineAnalyzer {
                 }
             }
 
-            return createResult(totalLength);
+            return createResult(BigDecimal.valueOf(totalLength));
         } catch (IOException e) {
             System.err.println("ZIP处理失败: " + e.getMessage());
-            return createResult(0.0d);
+            return createResult(BigDecimal.ZERO);
         }
     }
 
-    private Map<String, Object> createResult(Double data) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("type", "管道");
-        result.put("spec", "D48.3");
-        result.put("alias", "D48.3*4");
-        result.put("data", data);
-        result.put("unit", "m");
-        return result;
+    private CadItem createResult(BigDecimal data) {
+        CadItem item = new CadItem();
+        item.setAlias("D48.3*4");
+        item.setType("管道");
+        item.setSpec("D48.3");
+        item.setData(data);
+        item.setUnit("m");
+        return item;
     }
 
     public static void main(String[] args) {
         BuildingPipelineAnalyzer analyzer = new BuildingPipelineAnalyzer();
-        Map<String, Object> result = analyzer.calcTotalLength("d:\\cad_file2.zip");
+        CadItem result = analyzer.calcTotalLength("d:\\cad_file2.zip");
         System.out.println(result);
 
 //        String text = " 二十层 "

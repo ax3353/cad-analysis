@@ -16,7 +16,7 @@ public class ReportRequest {
     private String supplement_file_url;
 
     /**
-     * 核算单文件
+     *工程量确认单文件
      */
     private String confirm_file_url;
 }
