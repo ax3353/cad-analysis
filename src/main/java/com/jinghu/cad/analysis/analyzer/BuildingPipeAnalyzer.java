@@ -1,9 +1,11 @@
-package com.jinghu.cad.analysis.utils;
+package com.jinghu.cad.analysis.analyzer;
 
 
 import com.alibaba.fastjson.JSON;
 import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.pojo.CadItem;
+import com.jinghu.cad.analysis.utils.FileUtils;
+import com.jinghu.cad.analysis.utils.ZipFileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
 import org.kabeja.parser.Parser;
@@ -40,7 +42,7 @@ public class BuildingPipeAnalyzer {
     private static final Pattern THICKNESS_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)"); // 匹配整数或小数
     private static final Pattern PIPE_PATTERN = Pattern.compile(
             "^" +                                  // 锚定字符串开始
-                    "(D(?:N?\\d+(?:\\.\\d+)?))" +         // 组1: 直径（如 D48.3）
+                    "(DN?\\d+(?:\\.\\d+)?)" +         // 组1: 直径（如 D48.3）
                     "[-x×]" +                             // 分隔符（如 x）
                     "(?:" + THICKNESS_PATTERN.pattern() + "[-x×])?" + // 组2（可选）: 厚度（如 4）
                     "(\\d+(?:\\.\\d+)?)" +                // 组3: 长度（如 1.2）

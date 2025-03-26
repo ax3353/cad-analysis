@@ -1,6 +1,9 @@
-package com.jinghu.cad.analysis.utils;
+package com.jinghu.cad.analysis.analyzer;
 
+import com.alibaba.fastjson.JSON;
+import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.pojo.CadItem;
+import com.jinghu.cad.analysis.utils.ZipFileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
 import org.kabeja.parser.Parser;
@@ -30,18 +33,32 @@ public class OutboundPipeAnalyzer {
 
     private static final Pattern THICKNESS_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)"); // 匹配整数或小数
     private static final Pattern PIPE_PATTERN = Pattern.compile(
-            "(D(?:N?\\d+(?:\\.\\d+)?))" + // 匹配直径（如 D32, DN80, D21.3）
-                    "[-x×]" + // 分隔符：-、x 或 ×
-                    "(?:" + THICKNESS_PATTERN.pattern() + "[-×])?" + // 可选的厚度和分隔符
-                    "(\\d+(?:\\.\\d+)?)[mM]", // 匹配长度（如 0.2m）
+            "^" +                                  // 锚定字符串开始
+                    "(DN?\\d+(?:\\.\\d+)?)" +         // 组1: 直径（如 D48.3）
+                    "[-x×]" +                             // 分隔符（如 x）
+                    "(?:" + THICKNESS_PATTERN.pattern() + "[-x×])?" + // 组2（可选）: 厚度（如 4）
+                    "(\\d+(?:\\.\\d+)?)" +                // 组3: 长度（如 1.2）
+                    "[mM]" +                              // 后缀 m/M
+                    "$",                                  // 锚定字符串结束
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final String REGEX =
-            "(法兰球阀|金属软管|法兰盖)" + // 目标配件类型
-                    "(DN\\d+(?:\\.\\d+)?)" + // 配件规格
-                    "(?!.*\\d+\\s*[m米])"; // 排除含长度单位的情况
-    private static final Pattern FLANGE_PATTERN = Pattern.compile(REGEX, Pattern.CASE_INSENSITIVE);
+    private static final Pattern FLANGE_PATTERN = Pattern.compile(
+            "(法兰球阀)" +                      // 目标配件类型
+                    "(DN\\d+(?:\\.\\d+)?)" +        // 配件规格
+                    "(?!.*\\d+\\s*[m米])",          // 排除含长度单位的情况
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern HOSE_PATTERN = Pattern.compile(
+            "(金属软管)" +                      // 目标配件类型
+                    "(DN\\d+(?:\\.\\d+)?)" +        // 配件规格
+                    "(?!.*\\d+\\s*[m米])",          // 排除含长度单位的情况
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern FLANGE_COVER_PATTERN = Pattern.compile(
+            "(法兰盖)" +                      // 目标配件类型
+                    "(DN\\d+(?:\\.\\d+)?)" +        // 配件规格
+                    "(?!.*\\d+\\s*[m米])",          // 排除含长度单位的情况
+            Pattern.CASE_INSENSITIVE);
+
 
     private final List<CadItem> pipeInfos = new ArrayList<>();
     private final List<CadItem> flangeInfos = new ArrayList<>();
@@ -157,6 +174,8 @@ public class OutboundPipeAnalyzer {
             String currentText = text.getText().trim().replaceAll("\\s+", "");
             Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
             Matcher flangeMatcher = FLANGE_PATTERN.matcher(currentText);
+            Matcher hoseMatcher = HOSE_PATTERN.matcher(currentText);
+            Matcher flangeCoverMatcher = FLANGE_COVER_PATTERN.matcher(currentText);
 
             if (pipeMatcher.find()) {
                 String spec = pipeMatcher.group(1).toUpperCase();
@@ -173,13 +192,31 @@ public class OutboundPipeAnalyzer {
                 item.setType("管道");
                 item.setData(length);
                 item.setSpec(spec);
-                item.setNominalSpec(spec);
+                item.setNominalSpec(PipeDiameter.getPipeDiameter(spec).getNominalDiameterAlias());
                 pipeInfos.add(item);
             } else if (flangeMatcher.find()) {
                 CadItem item = new CadItem();
                 item.setAlias(flangeMatcher.group(1));
                 item.setUnit("个");
                 item.setType("法兰");
+                item.setData(new BigDecimal(1));
+                item.setSpec(flangeMatcher.group(2).toUpperCase());
+                item.setNominalSpec(item.getSpec());
+                pipeInfos.add(item);
+            } else if (hoseMatcher.find()){
+                CadItem item = new CadItem();
+                item.setAlias(flangeMatcher.group(1));
+                item.setUnit("个");
+                item.setType("金属软管");
+                item.setData(new BigDecimal(1));
+                item.setSpec(flangeMatcher.group(2).toUpperCase());
+                item.setNominalSpec(item.getSpec());
+                pipeInfos.add(item);
+            } else if (flangeCoverMatcher.find()) {
+                CadItem item = new CadItem();
+                item.setAlias(flangeMatcher.group(1));
+                item.setUnit("个");
+                item.setType("法兰盖");
                 item.setData(new BigDecimal(1));
                 item.setSpec(flangeMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
@@ -196,36 +233,34 @@ public class OutboundPipeAnalyzer {
         dataList.addAll(flangeInfos);
 
         // 按 alias 和 spec 共同分组
-        Map<String, List<CadItem>> grouped = dataList.stream()
-                .collect(Collectors.groupingBy(tag -> tag.getAlias() + "|" + tag.getSpec()));
+        Map<String, List<CadItem>> grouped = dataList.stream().collect(Collectors.groupingBy(CadItem::getType));
 
         List<CadItem> result = new ArrayList<>();
         for (Map.Entry<String, List<CadItem>> entry : grouped.entrySet()) {
-            List<CadItem> items = entry.getValue();
-            String[] keys = entry.getKey().split("\\|");
-
-            CadItem item = new CadItem();
-            item.setAlias(keys[0]);
-            item.setSpec(keys[1]);
-            item.setNominalSpec(keys[1]);
-            item.setType(items.get(0).getType());
-            item.setUnit(items.get(0).getUnit());
-            item.setData(items.stream()
-                    .map(CadItem::getData)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add));
-
-            result.add(item);
+            List<CadItem> dataList1 = entry.getValue();
+            Map<String, List<CadItem>> grouped1 = dataList1.stream().collect(Collectors.groupingBy(CadItem::getNominalSpec));
+            for (Map.Entry<String, List<CadItem>> entry1 : grouped1.entrySet()) {
+                String key1 = entry1.getKey();
+                List<CadItem> items1 = entry1.getValue();
+                CadItem item = new CadItem();
+                item.setName("");
+                item.setAlias(items1.stream().map(CadItem::getAlias).distinct().collect(Collectors.joining(",")));
+                item.setSpec(items1.stream().map(CadItem::getSpec).distinct().collect(Collectors.joining(",")));
+                item.setNominalSpec(key1);
+                item.setType(items1.get(0).getType());
+                item.setUnit(items1.get(0).getUnit());
+                item.setData(items1.stream()
+                        .map(CadItem::getData)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add));
+                result.add(item);
+            }
         }
         return result;
     }
 
     public static void main(String[] args) throws Exception {
-        // 支持 HTTP/ZIP/DXF
-        OutboundPipeAnalyzer extractor = new OutboundPipeAnalyzer();
-//        String path = "D:\\1津都雅苑-出地管道.dxf";
-//        String path = "D:\\cad_file2.zip";
-        String path = "http://ddns.limlim.cn:9000/ai/file/cad/cad_file2.zip";
-        List<CadItem> cadItems = extractor.executeAnalysis(path);
-        log.info("汇总数据: " + cadItems);
+        OutboundPipeAnalyzer analyzer = new OutboundPipeAnalyzer();
+        List<CadItem> result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\cad_file3.zip");
+        System.out.println(JSON.toJSONString(result));
     }
 }
