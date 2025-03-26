@@ -10,12 +10,29 @@ import java.math.BigDecimal;
 @Data
 public class CadItem {
 
+    /**
+     * 名称
+     */
+    private String name;
+
+    /**
+     * 别名
+     */
     private String alias;
 
+    /**
+     * 单位
+     */
     private String unit;
 
+    /**
+     * 类型 管道 法兰 楼层数
+     */
     private String type;
 
+    /**
+     * 数据
+     */
     private BigDecimal data;
 
     /**

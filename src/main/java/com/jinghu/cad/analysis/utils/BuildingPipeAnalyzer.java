@@ -1,6 +1,8 @@
 package com.jinghu.cad.analysis.utils;
 
 
+import com.alibaba.fastjson.JSON;
+import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
@@ -100,10 +102,11 @@ public class BuildingPipeAnalyzer {
     private void processDXFFile(String dxfPath) {
         try {
             Parser parser = ParserBuilder.createDefaultParser();
-            try (FileInputStream fis = new FileInputStream(dxfPath)) {
+            File file = new File(dxfPath);
+            try (FileInputStream fis = new FileInputStream(file)) {
                 parser.parse(fis, "UTF-8");
                 DXFDocument doc = parser.getDocument();
-                processDXFDocument(doc);
+                processDXFDocument(FileUtils.removeFileExtension(file.getName()), doc);
             }
         } catch (Exception e) {
             log.error("DXF处理失败: " + dxfPath + " - " + e.getMessage());
@@ -112,7 +115,7 @@ public class BuildingPipeAnalyzer {
 
     private void processDXFFiles(Path tempDir) throws IOException {
         Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
-                        && p.getFileName().toString().startsWith("出地管"))
+                        && p.getFileName().toString().startsWith("楼栋"))
                 .forEach(p -> processDXFFile(p.toString()));
 
         // 删除临时文件
@@ -130,15 +133,15 @@ public class BuildingPipeAnalyzer {
         }
     }
 
-    private void processDXFDocument(DXFDocument doc) {
+    private void processDXFDocument(String name, DXFDocument doc) {
         Iterator layerIterator = doc.getDXFLayerIterator();
         while (layerIterator.hasNext()) {
             DXFLayer layer = (DXFLayer) layerIterator.next();
-            processLayerEntities(layer);
+            processLayerEntities(name, layer);
         }
     }
 
-    private void processLayerEntities(DXFLayer layer) {
+    private void processLayerEntities(String name, DXFLayer layer) {
         Iterator entityTypeIterator = layer.getDXFEntityTypeIterator();
         while (entityTypeIterator.hasNext()) {
             String entityType = (String) entityTypeIterator.next();
@@ -146,17 +149,17 @@ public class BuildingPipeAnalyzer {
                 List<DXFEntity> entities = layer.getDXFEntities(entityType);
                 for (DXFEntity entity : entities) {
                     if (entity instanceof DXFText) {
-                        processTextEntity((DXFText) entity);
+                        processTextEntity(name, (DXFText) entity);
                     }
                     if (entity instanceof DXFMText) {
-                        processTextEntity((DXFMText) entity);
+                        processTextEntity(name, (DXFMText) entity);
                     }
                 }
             }
         }
     }
 
-    private void processTextEntity(DXFText text) {
+    private void processTextEntity(String name, DXFText text) {
         try {
             String currentText = text.getText().trim().replaceAll("\\s+", "");
             Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
@@ -172,12 +175,13 @@ public class BuildingPipeAnalyzer {
                 BigDecimal length = new BigDecimal(pipeMatcher.group(3));
 
                 CadItem item = new CadItem();
+                item.setName(name);
                 item.setAlias(alias);
                 item.setUnit("m");
                 item.setType("管道");
                 item.setData(length);
                 item.setSpec(spec);
-                item.setNominalSpec(spec);
+                item.setNominalSpec(PipeDiameter.getPipeDiameter(spec).getNominalDiameterAlias());
                 pipeInfos.add(item);
             } else if (floorMatcher.find()) {
                 floorCounts++;
@@ -188,34 +192,39 @@ public class BuildingPipeAnalyzer {
     }
 
     private List<CadItem> generateSummary() {
-        // 按 alias 和 spec 共同分组
-        Map<String, List<CadItem>> grouped = pipeInfos.stream()
-                .collect(Collectors.groupingBy(tag -> tag.getAlias() + "|" + tag.getSpec()));
+        // 按公制分组统计
+        Map<String, List<CadItem>> grouped = pipeInfos.stream().collect(Collectors.groupingBy(CadItem::getName));
 
         List<CadItem> result = new ArrayList<>();
         for (Map.Entry<String, List<CadItem>> entry : grouped.entrySet()) {
+            String key = entry.getKey();
             List<CadItem> items = entry.getValue();
-            String[] keys = entry.getKey().split("\\|");
-
-            CadItem item = new CadItem();
-            item.setAlias(keys[0]);
-            item.setSpec(keys[1]);
-            item.setNominalSpec(keys[1]);
-            item.setType(items.get(0).getType());
-            item.setUnit(items.get(0).getUnit());
-            item.setData(items.stream()
-                    .map(CadItem::getData)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add));
-            result.add(item);
+            Map<String, List<CadItem>> grouped1 = items.stream().collect(Collectors.groupingBy(CadItem::getNominalSpec));
+            for (Map.Entry<String, List<CadItem>> entry1 : grouped1.entrySet()) {
+                String key1 = entry1.getKey();
+                List<CadItem> items1 = entry1.getValue();
+                CadItem item = new CadItem();
+                item.setName(key);
+                item.setAlias(items1.stream().map(CadItem::getAlias).distinct().collect(Collectors.joining(",")));
+                item.setSpec(items1.stream().map(CadItem::getSpec).distinct().collect(Collectors.joining(",")));
+                item.setNominalSpec(key1);
+                item.setType(items1.get(0).getType());
+                item.setUnit(items1.get(0).getUnit());
+                item.setData(items1.stream()
+                        .map(CadItem::getData)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add));
+                result.add(item);
+            }
         }
 
         CadItem floorItem = new CadItem();
-        floorItem.setAlias("层数");
-        floorItem.setUnit("层");
-        floorItem.setType("楼层数");
+        floorItem.setName("户数");
+        floorItem.setAlias("f、F、层");
+        floorItem.setUnit("户");
+        floorItem.setType("户数");
         floorItem.setData(BigDecimal.valueOf(floorCounts));
-        floorItem.setSpec("层");
-        floorItem.setNominalSpec("层");
+        floorItem.setSpec("f、F、层");
+        floorItem.setNominalSpec("");
         result.add(floorItem);
 
         return result;
@@ -223,8 +232,8 @@ public class BuildingPipeAnalyzer {
 
     public static void main(String[] args) {
         BuildingPipeAnalyzer analyzer = new BuildingPipeAnalyzer();
-        List<CadItem> result = analyzer.executeAnalysis("d:\\cad_file2.zip");
-        System.out.println(result);
+        List<CadItem> result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\cad_file2.zip");
+        System.out.println(JSON.toJSONString(result));
 
 //        String text = " 二十层 "
 //                + "100F "
