@@ -2,6 +2,7 @@ package com.jinghu.cad.analysis.analyzer;
 
 import com.alibaba.fastjson.JSON;
 import com.jinghu.cad.analysis.enmus.PipeDiameter;
+import com.jinghu.cad.analysis.enmus.TypeEnums;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import com.jinghu.cad.analysis.utils.ZipFileUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -174,7 +175,7 @@ public class OutboundPipeAnalyzer {
             String currentText = text.getText().trim().replaceAll("\\s+", "");
             Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
             Matcher flangeMatcher = FLANGE_PATTERN.matcher(currentText);
-            Matcher hoseMatcher = HOSE_PATTERN.matcher(currentText);
+            Matcher metalRubberMatcher = HOSE_PATTERN.matcher(currentText);
             Matcher flangeCoverMatcher = FLANGE_COVER_PATTERN.matcher(currentText);
 
             if (pipeMatcher.find()) {
@@ -189,7 +190,7 @@ public class OutboundPipeAnalyzer {
                 CadItem item = new CadItem();
                 item.setAlias(alias);
                 item.setUnit("m");
-                item.setType("管道");
+                item.setType(TypeEnums.PIPE.getType());
                 item.setData(length);
                 item.setSpec(spec);
                 item.setNominalSpec(PipeDiameter.getPipeDiameter(spec).getNominalDiameterAlias());
@@ -198,16 +199,16 @@ public class OutboundPipeAnalyzer {
                 CadItem item = new CadItem();
                 item.setAlias(flangeMatcher.group(1));
                 item.setUnit("个");
-                item.setType("法兰");
+                item.setType(TypeEnums.FERRULE.getType());
                 item.setData(new BigDecimal(1));
                 item.setSpec(flangeMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
                 pipeInfos.add(item);
-            } else if (hoseMatcher.find()){
+            } else if (metalRubberMatcher.find()) {
                 CadItem item = new CadItem();
                 item.setAlias(flangeMatcher.group(1));
                 item.setUnit("个");
-                item.setType("金属软管");
+                item.setType(TypeEnums.METAL_RUBBER.getType());
                 item.setData(new BigDecimal(1));
                 item.setSpec(flangeMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
@@ -216,7 +217,7 @@ public class OutboundPipeAnalyzer {
                 CadItem item = new CadItem();
                 item.setAlias(flangeMatcher.group(1));
                 item.setUnit("个");
-                item.setType("法兰盖");
+                item.setType(TypeEnums.FERRULE_COVER.getType());
                 item.setData(new BigDecimal(1));
                 item.setSpec(flangeMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());

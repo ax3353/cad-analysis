@@ -1,6 +1,7 @@
 package com.jinghu.cad.analysis.controller;
 
 import com.alibaba.fastjson.JSON;
+import com.jinghu.cad.analysis.analyzer.ConfirmFileAnalyzer;
 import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import com.jinghu.cad.analysis.req.ReportRequest;
@@ -66,19 +67,13 @@ public class ReportController {
             // 4. 合并出地管和建筑管道数据
             List<CadItem> mergedData = mergeData(outboundPipeData, buildingPipeData);
 
-            // 5. 合并补充文件数据
-            if (StringUtils.hasText(supplementFileUrl)) {
-                supplementFile = downloadToTempFileEnhance(supplementFileUrl);
-                List<CadItem> supplementData = excelToCadItems(supplementFile);
-                mergedData = mergeData(supplementData, mergedData);
-            }
-
-            // 6. 公制转换
-            this.convertNominalSpec(mergedData);
-
             // 7. 合并工程量确认单
             if (StringUtils.hasText(confirmFileUrl)) {
                 confirmFile = downloadToTempFileEnhance(confirmFileUrl);
+                assert confirmFile != null;
+                String confirmFileAbsPath = confirmFile.getAbsolutePath();
+                ConfirmFileAnalyzer confirmFileAnalyzer = new ConfirmFileAnalyzer();
+                confirmFileAnalyzer.executeAnalysis(confirmFileAbsPath);
                 // todo
             }
 
@@ -138,55 +133,6 @@ public class ReportController {
         return tempFile;
     }
 
-    private List<CadItem> excelToCadItems(File excelFile) throws IOException {
-        if (excelFile == null) {
-            return new ArrayList<>();
-        }
-
-        Workbook workbook = WorkbookFactory.create(excelFile);
-        Sheet sheet = workbook.getSheetAt(0);
-        List<CadItem> result = new ArrayList<>();
-
-        for (Row row : sheet) {
-            if (row.getRowNum() == 0) {
-                continue;
-            }
-
-            CadItem item = new CadItem();
-            item.setType(getCellStringValue(row.getCell(0)));
-            item.setSpec(getCellStringValue(row.getCell(1)));
-            item.setNominalSpec(getCellStringValue(row.getCell(1)));
-            item.setAlias(getCellStringValue(row.getCell(2)));
-            item.setData(convertCellToBigDecimal(row.getCell(3)));
-            item.setUnit(getCellStringValue(row.getCell(4)));
-
-            result.add(item);
-        }
-        return result;
-    }
-
-    private String getCellStringValue(Cell cell) {
-        if (cell == null) {
-            return "";
-        }
-        cell.setCellType(CellType.STRING);
-        return cell.getStringCellValue().trim();
-    }
-
-    private BigDecimal convertCellToBigDecimal(Cell cell) {
-        if (cell == null) {
-            return BigDecimal.ZERO;
-        }
-        if (cell.getCellType() == CellType.NUMERIC) {
-            return BigDecimal.valueOf(cell.getNumericCellValue());
-        }
-        try {
-            return new BigDecimal(cell.getStringCellValue().trim());
-        } catch (Exception e) {
-            return BigDecimal.ZERO;
-        }
-    }
-
     public List<CadItem> mergeData(List<CadItem> dataA, List<CadItem> dataB) {
         // 用于存储合并后的数据，key 是 alias + "|" + spec
         Map<String, CadItem> merged = new HashMap<>();
@@ -215,32 +161,6 @@ public class ReportController {
 
         // 将 Map 转换为 List<CadItem> 返回
         return new ArrayList<>(merged.values());
-    }
-
-    private void convertNominalSpec(List<CadItem> items) {
-        for (CadItem item : items) {
-            String upperCaseSpec = item.getSpec().toUpperCase();
-            // 如果本身是公制则原规格等于公制
-            if (upperCaseSpec.startsWith("DN")) {
-                item.setNominalSpec(item.getSpec());
-                continue;
-            }
-
-            // 尝试转换
-            for (PipeDiameter diameter : PipeDiameter.values()) {
-                // 尝试匹配美制
-                if (diameter.getSeriesAOuterDiameterAlias().equals(upperCaseSpec)) {
-                    item.setNominalSpec(diameter.getNominalDiameterAlias());
-                    break;
-                }
-
-                // 尝试匹配欧制
-                if (diameter.getSeriesBOuterDiameterAlias().equals(upperCaseSpec)) {
-                    item.setNominalSpec(diameter.getNominalDiameterAlias());
-                    break;
-                }
-            }
-        }
     }
 
     private void deleteTempFile(File file) {

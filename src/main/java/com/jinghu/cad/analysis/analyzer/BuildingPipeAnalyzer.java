@@ -3,6 +3,7 @@ package com.jinghu.cad.analysis.analyzer;
 
 import com.alibaba.fastjson.JSON;
 import com.jinghu.cad.analysis.enmus.PipeDiameter;
+import com.jinghu.cad.analysis.enmus.TypeEnums;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import com.jinghu.cad.analysis.utils.FileUtils;
 import com.jinghu.cad.analysis.utils.ZipFileUtils;
@@ -180,7 +181,7 @@ public class BuildingPipeAnalyzer {
                 item.setName(name);
                 item.setAlias(alias);
                 item.setUnit("m");
-                item.setType("管道");
+                item.setType(TypeEnums.PIPE.getType());
                 item.setData(length);
                 item.setSpec(spec);
                 item.setNominalSpec(PipeDiameter.getPipeDiameter(spec).getNominalDiameterAlias());
@@ -223,7 +224,7 @@ public class BuildingPipeAnalyzer {
         floorItem.setName("户数");
         floorItem.setAlias("f、F、层");
         floorItem.setUnit("户");
-        floorItem.setType("户数");
+        floorItem.setType(TypeEnums.FLOOR.getType());
         floorItem.setData(BigDecimal.valueOf(floorCounts));
         floorItem.setSpec("f、F、层");
         floorItem.setNominalSpec("");
