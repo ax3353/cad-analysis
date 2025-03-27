@@ -1,4 +1,4 @@
-package com.jinghu.cad.analysis.pojo;
+package com.jinghu.cad.analysis.dto;
 
 import lombok.Data;
 

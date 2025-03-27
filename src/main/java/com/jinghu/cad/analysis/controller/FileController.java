@@ -1,7 +1,7 @@
 package com.jinghu.cad.analysis.controller;
 
-import com.jinghu.cad.analysis.resp.R;
-import com.jinghu.cad.analysis.resp.UploadResp;
+import com.jinghu.cad.analysis.vo.resp.R;
+import com.jinghu.cad.analysis.vo.resp.UploadResp;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;

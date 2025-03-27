@@ -1,4 +1,4 @@
-package com.jinghu.cad.analysis.req;
+package com.jinghu.cad.analysis.vo.req;
 
 import lombok.Data;
 

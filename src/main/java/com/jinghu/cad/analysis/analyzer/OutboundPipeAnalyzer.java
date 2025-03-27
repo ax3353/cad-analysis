@@ -3,7 +3,7 @@ package com.jinghu.cad.analysis.analyzer;
 import com.alibaba.fastjson.JSON;
 import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.enmus.TypeEnums;
-import com.jinghu.cad.analysis.pojo.CadItem;
+import com.jinghu.cad.analysis.dto.CadItem;
 import com.jinghu.cad.analysis.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;

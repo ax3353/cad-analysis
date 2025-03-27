@@ -6,7 +6,7 @@ import com.jinghu.cad.analysis.excel.ConfirmFileData;
 import com.jinghu.cad.analysis.excel.ConfirmFileDataList;
 import com.jinghu.cad.analysis.excel.MergeResultData;
 import com.jinghu.cad.analysis.excel.MergeResultDataList;
-import com.jinghu.cad.analysis.pojo.CadItem;
+import com.jinghu.cad.analysis.dto.CadItem;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
