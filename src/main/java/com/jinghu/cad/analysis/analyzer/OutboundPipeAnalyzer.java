@@ -1,9 +1,9 @@
 package com.jinghu.cad.analysis.analyzer;
 
 import com.alibaba.fastjson.JSON;
+import com.jinghu.cad.analysis.dto.CadItem;
 import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.enmus.TypeEnums;
-import com.jinghu.cad.analysis.dto.CadItem;
 import com.jinghu.cad.analysis.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
@@ -165,6 +165,7 @@ public class OutboundPipeAnalyzer {
                 item.setData(length);
                 item.setSpec(spec);
                 item.setNominalSpec(PipeDiameter.getPipeDiameterStr(spec));
+                item.setName(TypeEnums.PIPE.getType() + " " + item.getNominalSpec());
                 cadItems.add(item);
             } else if (flangeBallValveMatcher.find()) {
                 CadItem item = new CadItem();
@@ -174,6 +175,7 @@ public class OutboundPipeAnalyzer {
                 item.setData(new BigDecimal(1));
                 item.setSpec(flangeBallValveMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
+                item.setName(TypeEnums.FERRULE_BALL_VALVE.getType() + " " + item.getNominalSpec());
                 cadItems.add(item);
             } else if (metalBallValveMatcher.find()) {
                 CadItem item = new CadItem();
@@ -183,6 +185,8 @@ public class OutboundPipeAnalyzer {
                 item.setData(new BigDecimal(1));
                 item.setSpec(metalBallValveMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
+                item.setName(TypeEnums.METAL_BALL_VALVE.getType() + " " + item.getNominalSpec());
+                cadItems.add(item);
             } else if (metalHoseMatcher.find()) {
                 CadItem item = new CadItem();
                 item.setAlias(flangeBallValveMatcher.group(1));
@@ -191,6 +195,7 @@ public class OutboundPipeAnalyzer {
                 item.setData(new BigDecimal(1));
                 item.setSpec(flangeBallValveMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
+                item.setName(TypeEnums.METAL_HOSE.getType() + " " + item.getNominalSpec());
                 cadItems.add(item);
             } else if (flangeCoverMatcher.find()) {
                 CadItem item = new CadItem();
@@ -200,6 +205,7 @@ public class OutboundPipeAnalyzer {
                 item.setData(new BigDecimal(1));
                 item.setSpec(flangeBallValveMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
+                item.setName(TypeEnums.FERRULE_COVER.getType() + " " + item.getNominalSpec());
                 cadItems.add(item);
             }
         } catch (Exception e) {
@@ -222,7 +228,7 @@ public class OutboundPipeAnalyzer {
                 String key1 = entry1.getKey();
                 List<CadItem> items1 = entry1.getValue();
                 CadItem item = new CadItem();
-                item.setName("");
+                item.setName(items1.stream().map(CadItem::getName).distinct().collect(Collectors.joining(",")));
                 item.setAlias(items1.stream().map(CadItem::getAlias).distinct().collect(Collectors.joining(",")));
                 item.setSpec(items1.stream().map(CadItem::getSpec).distinct().collect(Collectors.joining(",")));
                 item.setNominalSpec(key1);

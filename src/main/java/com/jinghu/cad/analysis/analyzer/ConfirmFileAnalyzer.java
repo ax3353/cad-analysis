@@ -7,6 +7,7 @@ import com.jinghu.cad.analysis.enmus.TypeEnums;
 import com.jinghu.cad.analysis.excel.ConfirmFileData;
 import com.jinghu.cad.analysis.excel.ConfirmFileDataList;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.net.HttpURLConnection;
@@ -80,6 +81,9 @@ public class ConfirmFileAnalyzer {
             File file = new File(xlsxPath);
             List<ConfirmFileData> list = EasyExcel.read(file).head(ConfirmFileData.class).sheet().doReadSync();
             for (ConfirmFileData confirmFileData : list) {
+                if (StringUtils.isBlank(confirmFileData.getName())) {
+                    continue;
+                }
                 boolean isAdd = true;
                 if (confirmFileData.getName().contains(ConfirmFileDataList.part1Name)) {
                     current = part1;
