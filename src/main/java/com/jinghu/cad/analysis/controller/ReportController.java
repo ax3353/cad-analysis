@@ -4,15 +4,16 @@ import com.jinghu.cad.analysis.analyzer.BuildingPipeAnalyzer;
 import com.jinghu.cad.analysis.analyzer.ConfirmFileAnalyzer;
 import com.jinghu.cad.analysis.analyzer.OutboundPipeAnalyzer;
 import com.jinghu.cad.analysis.delegate.MergeDelegate;
+import com.jinghu.cad.analysis.dto.CadItem;
 import com.jinghu.cad.analysis.excel.ConfirmFileDataList;
 import com.jinghu.cad.analysis.excel.MergeResultDataList;
-import com.jinghu.cad.analysis.dto.CadItem;
+import com.jinghu.cad.analysis.utils.FileUtils;
 import com.jinghu.cad.analysis.vo.req.ReportRequest;
 import com.jinghu.cad.analysis.vo.resp.R;
 import com.jinghu.cad.analysis.vo.resp.ReportResp;
-import com.jinghu.cad.analysis.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,7 +25,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/")
-public class ReportController {
+public class ReportController implements CommandLineRunner {
 
     @Value("${file.upload-path}")
     private String uploadPath;
@@ -65,9 +66,9 @@ public class ReportController {
             return R.error("CAD图纸智能分析失败：" + e.getMessage());
         } finally {
             // 清理临时文件
-            FileUtils.deleteFile(buildingPipeFile);
-            FileUtils.deleteFile(outboundPipeFile);
-            FileUtils.deleteFile(confirmFile);
+//            FileUtils.deleteFile(buildingPipeFile);
+//            FileUtils.deleteFile(outboundPipeFile);
+//            FileUtils.deleteFile(confirmFile);
             log.info("删除CAD临时文件");
         }
     }
@@ -89,7 +90,8 @@ public class ReportController {
         return reportResp;
     }
 
-    public static void main(String[] args) {
+    @Override
+    public void run(String... args) throws Exception {
         ReportController controller = new ReportController();
         controller.uploadPath = "D:/upload/";
         String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\1津都雅苑-户数(1).dxf";

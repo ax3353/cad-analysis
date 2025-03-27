@@ -2,11 +2,13 @@ package com.jinghu.cad.analysis.delegate;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
+import com.jinghu.cad.analysis.dto.CadItem;
 import com.jinghu.cad.analysis.excel.ConfirmFileData;
 import com.jinghu.cad.analysis.excel.ConfirmFileDataList;
 import com.jinghu.cad.analysis.excel.MergeResultData;
 import com.jinghu.cad.analysis.excel.MergeResultDataList;
-import com.jinghu.cad.analysis.dto.CadItem;
+import com.jinghu.cad.analysis.service.IMaterialBillService;
+import com.jinghu.cad.analysis.utils.SpringUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -31,6 +33,8 @@ import java.util.stream.Collectors;
 @Data
 @Slf4j
 public class MergeDelegate {
+
+    private static IMaterialBillService iMaterialBillService = SpringUtils.getBean(IMaterialBillService.class);
 
     public static MergeResultDataList merge(List<CadItem> buildingPipeData, List<CadItem> outboundPipeData, ConfirmFileDataList confirmFileDataList) {
         List<MergeResultData> partResult1 = new ArrayList<>();
@@ -89,6 +93,7 @@ public class MergeDelegate {
                 mergeResultData.setNumber(String.valueOf(index2.getAndIncrement()));
                 mergeResultData.setDataOrigin("工程量确认单");
                 mergeResultData.setName(confirmFileData.getName());
+                mergeResultData.setMaterialCode(iMaterialBillService.getMaterialCode(mergeResultData.getName()));
                 mergeResultData.setNominalSpec(confirmFileData.getNominalSpec());
                 mergeResultData.setUnit(confirmFileData.getUnit());
 
@@ -148,6 +153,7 @@ public class MergeDelegate {
                 mergeResultData.setNumber(String.valueOf(index2.getAndIncrement()));
                 mergeResultData.setDataOrigin("工程量确认单");
                 mergeResultData.setName(confirmFileData.getName());
+                mergeResultData.setMaterialCode(iMaterialBillService.getMaterialCode(mergeResultData.getName()));
                 mergeResultData.setNominalSpec(confirmFileData.getNominalSpec());
                 mergeResultData.setUnit(confirmFileData.getUnit());
 

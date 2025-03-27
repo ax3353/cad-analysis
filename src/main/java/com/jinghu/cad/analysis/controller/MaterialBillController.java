@@ -1,10 +1,12 @@
 package com.jinghu.cad.analysis.controller;
 
 import com.alibaba.excel.EasyExcel;
+import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.entity.MaterialBill;
-import com.jinghu.cad.analysis.excel.MaterialBillData;
+import com.jinghu.cad.analysis.excel.MaterialBill1Data;
 import com.jinghu.cad.analysis.service.IMaterialBillService;
 import com.jinghu.cad.analysis.vo.resp.R;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,15 +33,7 @@ public class MaterialBillController {
 
     @RequestMapping("/upload")
     public R<?> upload(MultipartFile file) throws IOException {
-        List<MaterialBillData> list = EasyExcel.read(file.getInputStream()).head(MaterialBillData.class).sheet().doReadSync();
-        iMaterialBillService.remove(null);
-        iMaterialBillService.saveBatch(list.stream().map(item -> {
-            MaterialBill materialBill = new MaterialBill();
-            materialBill.setMaterialType(item.getMaterialType());
-            materialBill.setMaterialCode(item.getMaterialCode());
-            materialBill.setMaterialSpec(item.getMaterialSpec());
-            return materialBill;
-        }).collect(Collectors.toList()));
+        iMaterialBillService.upload(file);
         return R.success("upload success");
     }
 }

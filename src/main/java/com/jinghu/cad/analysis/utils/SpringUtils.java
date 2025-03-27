@@ -17,6 +17,13 @@ public class SpringUtils implements ApplicationContextAware {
 
     private static ApplicationContext applicationContext;
 
+    public static <T> T getBean(Class<T> clazz) {
+        if (applicationContext == null) {
+            return null;
+        }
+        return applicationContext.getBean(clazz);
+    }
+
     // 获取环境变量值
     public static String getEnv(String key, String defaultValue) {
         if (applicationContext == null) {

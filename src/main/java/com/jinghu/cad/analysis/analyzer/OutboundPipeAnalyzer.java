@@ -164,7 +164,7 @@ public class OutboundPipeAnalyzer {
                 item.setType(TypeEnums.PIPE.getType());
                 item.setData(length);
                 item.setSpec(spec);
-                item.setNominalSpec(PipeDiameter.getPipeDiameter(spec).getNominalDiameterAlias());
+                item.setNominalSpec(PipeDiameter.getPipeDiameterStr(spec));
                 cadItems.add(item);
             } else if (flangeBallValveMatcher.find()) {
                 CadItem item = new CadItem();

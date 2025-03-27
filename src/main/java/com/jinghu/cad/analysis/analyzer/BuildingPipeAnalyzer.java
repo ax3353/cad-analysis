@@ -148,7 +148,7 @@ public class BuildingPipeAnalyzer {
                 item.setType(TypeEnums.PIPE.getType());
                 item.setData(length);
                 item.setSpec(spec);
-                item.setNominalSpec(PipeDiameter.getPipeDiameter(spec).getNominalDiameterAlias());
+                item.setNominalSpec(PipeDiameter.getPipeDiameterStr(spec));
                 pipeInfos.add(item);
             } else if (paishapedBendMatcher.find()) {
                 paiCounts++;

@@ -98,7 +98,7 @@ public class ConfirmFileAnalyzer {
                     boolean isMatch = false;
                     if (confirmFileData.getName().contains("管") && confirmFileData.getUnit().equals("米")) {
                         confirmFileData.setType(TypeEnums.PIPE.getType());
-                        confirmFileData.setNominalSpec(PipeDiameter.getPipeDiameter(confirmFileData.getWorkSpec()).getNominalDiameterAlias());
+                        confirmFileData.setNominalSpec(PipeDiameter.getPipeDiameterStr(confirmFileData.getWorkSpec()));
                         isMatch = true;
                     }
                     if (confirmFileData.getName().contains("法兰球阀")) {

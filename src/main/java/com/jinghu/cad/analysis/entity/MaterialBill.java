@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.io.Serializable;
+
 /**
  * <p>
  * 物料清单
@@ -25,17 +26,33 @@ public class MaterialBill implements Serializable {
     private Integer id;
 
     /**
-     * 物料类型
-     */
-    private String materialType;
-
-    /**
      * 物料编码
      */
     private String materialCode;
+    /**
+     * 物料类型
+     */
+    private String materialType;
+    /**
+     * 物料扩展1
+     */
+    private String materialExt1;
+    /**
+     * 物料扩展2
+     */
+    private String materialExt2;
+    /**
+     * 物料名称
+     */
+    private String materialName;
 
     /**
-     * 物流规格
+     * 规格型号
      */
     private String materialSpec;
+
+    /**
+     * 公制型号
+     */
+    private String materialNominalSpec;
 }

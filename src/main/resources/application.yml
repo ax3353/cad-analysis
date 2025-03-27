@@ -23,6 +23,9 @@ spring:
     url: jdbc:mysql://ddns.limlim.cn:3306/cad_analysis?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: Renqing123B2b456
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 #日志文件输出路径
 logging:

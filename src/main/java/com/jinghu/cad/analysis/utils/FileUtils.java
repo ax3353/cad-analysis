@@ -67,7 +67,7 @@ public class FileUtils {
         String fileName = url.substring(url.lastIndexOf("/"));
         File dest;
         try {
-            dest = Paths.get(SpringUtils.getEnv("upload.path", "D:/upload"), "files", fileName).toFile();
+            dest = Paths.get(SpringUtils.getEnv("file.upload-path", "D:/upload"), "files", fileName).toFile();
             if (dest.exists()) {
                 log.info("文件 {} 已存在跳过下载", dest.getAbsolutePath());
                 return dest;
@@ -85,8 +85,8 @@ public class FileUtils {
             return null;
         }
         String fileName = url.substring(url.lastIndexOf("/"));
-        FileUtils.downloadFile(url, Paths.get(SpringUtils.getEnv("upload.path", "D:/upload"), "files", fileName));
-        return Paths.get(SpringUtils.getEnv("upload.path", "D:/upload"), "files", fileName).toFile();
+        FileUtils.downloadFile(url, Paths.get(SpringUtils.getEnv("file.upload-path", "D:/upload"), "files", fileName));
+        return Paths.get(SpringUtils.getEnv("file.upload-path", "D:/upload"), "files", fileName).toFile();
     }
 
     public static void downloadFile(String urlString, Path destination) throws IOException {

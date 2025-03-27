@@ -108,4 +108,13 @@ public enum PipeDiameter {
         }
         return UNKNOWN;
     }
+
+    public static String getPipeDiameterStr(String spec) {
+        PipeDiameter pipeDiameter = getPipeDiameter(spec);
+        if (pipeDiameter != UNKNOWN) {
+            return pipeDiameter.getNominalDiameterAlias();
+        } else {
+            return spec;
+        }
+    }
 }
