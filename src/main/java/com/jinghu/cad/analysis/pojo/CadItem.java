@@ -44,4 +44,9 @@ public class CadItem {
      * 公制原规格
      */
     private String nominalSpec;
+
+    /**
+     * 是否合并
+     */
+    private Boolean isMerge = false;
 }

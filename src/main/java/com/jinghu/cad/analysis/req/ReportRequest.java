@@ -6,17 +6,17 @@ import lombok.Data;
 public class ReportRequest {
 
     /**
-     * cad文件
+     * cad楼栋文件
      */
-    private String cad_files_url;
+    private String buildingPipeUrl;
 
     /**
-     * 补充文件
+     * cad出地管文件
      */
-    private String supplement_file_url;
+    private String outboundPipeUrl;
 
     /**
-     *工程量确认单文件
+     * 工程量确认单文件
      */
-    private String confirm_file_url;
+    private String confirmFileUrl;
 }

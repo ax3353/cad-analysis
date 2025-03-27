@@ -1,31 +1,25 @@
 package com.jinghu.cad.analysis.controller;
 
-import com.alibaba.fastjson.JSON;
+import com.jinghu.cad.analysis.analyzer.BuildingPipeAnalyzer;
 import com.jinghu.cad.analysis.analyzer.ConfirmFileAnalyzer;
-import com.jinghu.cad.analysis.enmus.PipeDiameter;
+import com.jinghu.cad.analysis.analyzer.OutboundPipeAnalyzer;
+import com.jinghu.cad.analysis.delegate.MergeDelegate;
+import com.jinghu.cad.analysis.excel.ConfirmFileDataList;
+import com.jinghu.cad.analysis.excel.MergeResultDataList;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import com.jinghu.cad.analysis.req.ReportRequest;
-import com.jinghu.cad.analysis.analyzer.BuildingPipeAnalyzer;
-import com.jinghu.cad.analysis.analyzer.OutboundPipeAnalyzer;
+import com.jinghu.cad.analysis.resp.R;
+import com.jinghu.cad.analysis.resp.ReportResp;
+import com.jinghu.cad.analysis.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Stream;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -36,141 +30,71 @@ public class ReportController {
     private String uploadPath;
 
     @PostMapping("/report")
-    public String report(@RequestBody ReportRequest request) {
-        String cadFilesUrl = request.getCad_files_url();
-        String supplementFileUrl = request.getSupplement_file_url();
-        String confirmFileUrl = request.getConfirm_file_url();
+    public R<?> report(@RequestBody ReportRequest request) {
+        String buildingPipeUrl = request.getBuildingPipeUrl();
+        String outboundPipeUrl = request.getOutboundPipeUrl();
+        String confirmFileUrl = request.getConfirmFileUrl();
 
-        log.info("开始分析CAD图纸, 文件地址: " + cadFilesUrl);
+        log.info("开始分析CAD图纸, 楼栋文件地址: {}", buildingPipeUrl);
+        log.info("开始分析CAD图纸, 出地管文件地址: {}", outboundPipeUrl);
+        log.info("开始分析CAD图纸, 工程量确认单文件地址: {}", confirmFileUrl);
 
         // 下载文件
-        File cadZipFile = null;
-        File supplementFile = null;
+        File buildingPipeFile = null;
+        File outboundPipeFile = null;
         File confirmFile = null;
         try {
             // 1. 下载 CAD 文件
-            cadZipFile = downloadToTempFileEnhance(cadFilesUrl);
-            if (cadZipFile == null) {
-                return "CAD 文件下载失败";
+            buildingPipeFile = FileUtils.downloadToTempFileEnhance(buildingPipeUrl);
+            outboundPipeFile = FileUtils.downloadToTempFileEnhance(outboundPipeUrl);
+            confirmFile = FileUtils.downloadToTempFileEnhance(confirmFileUrl);
+            if (buildingPipeFile == null || outboundPipeFile == null || confirmFile == null) {
+                return R.error("CAD 文件下载失败");
             }
 
-            String cadZipFileAbsPath = cadZipFile.getAbsolutePath();
+            String buildingPipeFileAbsPath = buildingPipeFile.getAbsolutePath();
+            String outboundPipeFileAbsPath = outboundPipeFile.getAbsolutePath();
+            String confirmFileAbsPath = confirmFile.getAbsolutePath();
 
-            // 2. 解析出地管数据
-            OutboundPipeAnalyzer outboundPipeAnalyzer = new OutboundPipeAnalyzer();
-            List<CadItem> outboundPipeData = outboundPipeAnalyzer.executeAnalysis(cadZipFileAbsPath);
+            ReportResp resp = doReport(buildingPipeFileAbsPath, outboundPipeFileAbsPath, confirmFileAbsPath);
 
-            // 3. 解析建筑管道数据
-            BuildingPipeAnalyzer buildingPipeAnalyzer = new BuildingPipeAnalyzer();
-            List<CadItem> buildingPipeData = buildingPipeAnalyzer.executeAnalysis(cadZipFileAbsPath);
-
-            // 4. 合并出地管和建筑管道数据
-            List<CadItem> mergedData = mergeData(outboundPipeData, buildingPipeData);
-
-            // 7. 合并工程量确认单
-            if (StringUtils.hasText(confirmFileUrl)) {
-                confirmFile = downloadToTempFileEnhance(confirmFileUrl);
-                assert confirmFile != null;
-                String confirmFileAbsPath = confirmFile.getAbsolutePath();
-                ConfirmFileAnalyzer confirmFileAnalyzer = new ConfirmFileAnalyzer();
-                confirmFileAnalyzer.executeAnalysis(confirmFileAbsPath);
-                // todo
-            }
-
-            // 8. 返回结果
-            String jsonString = JSON.toJSONString(mergedData);
-            log.info("完成CAD图纸识别，返回结果: {}", jsonString);
-            return jsonString;
+            log.info("完成CAD图纸识别，返回结果: {}", resp);
+            return R.success(resp);
         } catch (Exception e) {
-            return "处理失败: " + e.getMessage();
+            log.error("CAD图纸智能分析失败", e);
+            return R.error("CAD图纸智能分析失败：" + e.getMessage());
         } finally {
             // 清理临时文件
-            deleteTempFile(cadZipFile);
-            deleteTempFile(supplementFile);
-            deleteTempFile(confirmFile);
+            FileUtils.deleteFile(buildingPipeFile);
+            FileUtils.deleteFile(outboundPipeFile);
+            FileUtils.deleteFile(confirmFile);
             log.info("删除CAD临时文件");
         }
     }
 
-    private File downloadToTempFileEnhance(String url) {
-        if (!StringUtils.hasText(url)) {
-            return null;
-        }
+    private ReportResp doReport(String buildingPipeFileAbsPath, String outboundPipeFileAbsPath, String confirmFileAbsPath) {
+        // 2. 解析出地管数据
+        List<CadItem> outboundPipeData = new OutboundPipeAnalyzer().executeAnalysis(outboundPipeFileAbsPath);
 
-        String fileName = url.substring(url.lastIndexOf("/"));
-        File dest;
-        try {
-            dest = Paths.get(uploadPath, "files", fileName).toFile();
-            if (dest.exists()) {
-                log.info("文件 {} 已存在跳过下载", dest.getAbsolutePath());
-                return dest;
-            } else {
-                return downloadToTempFile(url);
-            }
-        } catch (Exception e) {
-            log.error("下载文件失败", e);
-            return null;
-        }
+        // 3. 解析建筑管道数据
+        List<CadItem> buildingPipeData = new BuildingPipeAnalyzer().executeAnalysis(buildingPipeFileAbsPath);
+
+        // 7. 合并工程量确认单
+        ConfirmFileDataList confirmFileDataList = new ConfirmFileAnalyzer().executeAnalysis(confirmFileAbsPath);
+        MergeResultDataList merge = MergeDelegate.merge(buildingPipeData, outboundPipeData, confirmFileDataList);
+        File file = MergeDelegate.generateExcel(uploadPath, merge);
+        ReportResp reportResp = new ReportResp();
+        reportResp.setReportFileUrl(FileUtils.getUrl(file));
+        reportResp.setReportDetail(merge.adapter());
+        return reportResp;
     }
 
-    private File downloadToTempFile(String url) throws IOException {
-        if (!StringUtils.hasText(url)) {
-            return null;
-        }
-
-        URL fileUrl = new URL(url);
-        String suffix = url.contains(".zip") ? ".zip" : ".xlsx";
-        File tempFile = File.createTempFile("cad_", suffix);
-
-        try (InputStream in = fileUrl.openStream();
-             FileOutputStream out = new FileOutputStream(tempFile)) {
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = in.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
-            }
-        }
-        return tempFile;
-    }
-
-    public List<CadItem> mergeData(List<CadItem> dataA, List<CadItem> dataB) {
-        // 用于存储合并后的数据，key 是 alias + "|" + spec
-        Map<String, CadItem> merged = new HashMap<>();
-
-        // 将 dataA 和 dataB 合并处理
-        Stream.concat(dataA.stream(), dataB.stream()).forEach(item -> {
-            String key = item.getAlias() + "|" + item.getSpec();
-            CadItem existing = merged.get(key);
-
-            if (existing != null) {
-                // 如果已存在相同 key 的 CadItem，累加 data 值
-                BigDecimal sum = existing.getData().add(item.getData());
-                existing.setData(sum);
-            } else {
-                // 如果不存在，直接添加到 merged 中
-                CadItem newItem = new CadItem();
-                newItem.setAlias(item.getAlias());
-                newItem.setUnit(item.getUnit());
-                newItem.setType(item.getType());
-                newItem.setData(item.getData());
-                newItem.setSpec(item.getSpec());
-                newItem.setNominalSpec(item.getSpec());
-                merged.put(key, newItem);
-            }
-        });
-
-        // 将 Map 转换为 List<CadItem> 返回
-        return new ArrayList<>(merged.values());
-    }
-
-    private void deleteTempFile(File file) {
-        if (file != null && file.exists()) {
-            try {
-                log.info("删除临时文件: {}", file.toPath());
-                Files.delete(file.toPath());
-            } catch (IOException e) {
-                log.error("删除临时文件失败: " + file.getAbsolutePath());
-            }
-        }
+    public static void main(String[] args) {
+        ReportController controller = new ReportController();
+        controller.uploadPath = "D:/upload/";
+        String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\1津都雅苑-户数(1).dxf";
+        String outboundPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\1津都雅苑-出地管道.dxf";
+        String confirmFileAbsPath = "C:\\Users\\Liming\\Desktop\\完工确认单(1).xlsx";
+        controller.doReport(buildingPipeFileAbsPath, outboundPipeFileAbsPath, confirmFileAbsPath);
     }
 }

@@ -6,7 +6,6 @@ import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.enmus.TypeEnums;
 import com.jinghu.cad.analysis.pojo.CadItem;
 import com.jinghu.cad.analysis.utils.FileUtils;
-import com.jinghu.cad.analysis.utils.ZipFileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
 import org.kabeja.parser.Parser;
@@ -15,14 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigDecimal;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -55,14 +47,33 @@ public class BuildingPipeAnalyzer {
     private final List<CadItem> pipeInfos = new ArrayList<>();
     private int floorCounts = 0;
 
+    public static void main(String[] args) {
+        BuildingPipeAnalyzer analyzer = new BuildingPipeAnalyzer();
+        List<CadItem> result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\cad_file2.zip");
+        System.out.println(JSON.toJSONString(result));
+
+//        String text = " 二十层 "
+//                + "100F "
+//                + "、二十层"
+//                + "三层楼"
+//                + "零0层"
+//                + "01F"
+//                + "100F。"
+//                + "这是一层"
+//                + "独立词100F";
+//        String regex = "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)";
+//        Matcher matcher = Pattern.compile(regex).matcher(text);
+//        while (matcher.find()) {
+//            System.out.println("匹配到: " + matcher.group());
+//        }
+    }
+
     public List<CadItem> executeAnalysis(String filePath) {
         try {
             if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-                processRemoteZip(filePath);
-            } else if (filePath.endsWith(".zip")) {
-                processLocalZip(filePath);
+                processRemoteFile(filePath);
             } else {
-                processDXFFile(filePath);
+                processLocalFile(new File(filePath));
             }
 
             return this.generateSummary();
@@ -75,76 +86,44 @@ public class BuildingPipeAnalyzer {
     /**
      * 远程文件，如：http://www.qq.com/test.zip
      */
-    private void processRemoteZip(String urlString) throws Exception {
-        URL url = new URL(urlString);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-
-        try (InputStream is = connection.getInputStream()) {
-            Path tempDir = Files.createTempDirectory("cad_outbound_pipe");
-            Path tempZip = Files.createTempFile("temp", ".zip");
-            Files.copy(is, tempZip, StandardCopyOption.REPLACE_EXISTING);
-            ZipFileUtils.unzip(tempZip.toString(), tempDir.toString());
-            Files.deleteIfExists(tempZip);
-            processDXFFiles(tempDir);
-        }
+    private void processRemoteFile(String urlString) throws Exception {
+        File file = FileUtils.downloadToTempFileEnhance(urlString);
+        assert file != null;
+        processLocalFile(file);
     }
 
     /**
      * 本地文件，如：D:\test.zip
      */
-    private void processLocalZip(String zipPath) throws Exception {
-        Path tempDir = Files.createTempDirectory("cad_outbound_pipeline");
-        ZipFileUtils.unzip(zipPath, tempDir.toString());
-        processDXFFiles(tempDir);
+    private void processLocalFile(File file) throws Exception {
+        processDXFFile(file);
     }
 
     /**
      * 本地DXF文件，如：D:\test.dxf
      */
-    private void processDXFFile(String dxfPath) {
+    private void processDXFFile(File file) {
         try {
             Parser parser = ParserBuilder.createDefaultParser();
-            File file = new File(dxfPath);
             try (FileInputStream fis = new FileInputStream(file)) {
                 parser.parse(fis, "UTF-8");
                 DXFDocument doc = parser.getDocument();
-                processDXFDocument(FileUtils.removeFileExtension(file.getName()), doc);
+                processDXFDocument(doc);
             }
         } catch (Exception e) {
-            log.error("DXF处理失败: " + dxfPath + " - " + e.getMessage());
+            log.error("DXF处理失败: {} - {}", file, e.getMessage());
         }
     }
 
-    private void processDXFFiles(Path tempDir) throws IOException {
-        Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
-                        && p.getFileName().toString().startsWith("楼栋"))
-                .forEach(p -> processDXFFile(p.toString()));
-
-        // 删除临时文件
-        if (Files.exists(tempDir)) {
-            try {
-                Files.walk(tempDir)
-                        // 逆序遍历，先删文件再删目录
-                        .sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
-                log.info("成功删除临时目录: {}", tempDir);
-            } catch (IOException e) {
-                log.warn("删除临时目录: {} 失败", tempDir, e);
-            }
-        }
-    }
-
-    private void processDXFDocument(String name, DXFDocument doc) {
+    private void processDXFDocument(DXFDocument doc) {
         Iterator layerIterator = doc.getDXFLayerIterator();
         while (layerIterator.hasNext()) {
             DXFLayer layer = (DXFLayer) layerIterator.next();
-            processLayerEntities(name, layer);
+            processLayerEntities(layer);
         }
     }
 
-    private void processLayerEntities(String name, DXFLayer layer) {
+    private void processLayerEntities(DXFLayer layer) {
         Iterator entityTypeIterator = layer.getDXFEntityTypeIterator();
         while (entityTypeIterator.hasNext()) {
             String entityType = (String) entityTypeIterator.next();
@@ -152,17 +131,17 @@ public class BuildingPipeAnalyzer {
                 List<DXFEntity> entities = layer.getDXFEntities(entityType);
                 for (DXFEntity entity : entities) {
                     if (entity instanceof DXFText) {
-                        processTextEntity(name, (DXFText) entity);
+                        processTextEntity((DXFText) entity);
                     }
                     if (entity instanceof DXFMText) {
-                        processTextEntity(name, (DXFMText) entity);
+                        processTextEntity((DXFMText) entity);
                     }
                 }
             }
         }
     }
 
-    private void processTextEntity(String name, DXFText text) {
+    private void processTextEntity(DXFText text) {
         try {
             String currentText = text.getText().trim().replaceAll("\\s+", "");
             Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
@@ -178,7 +157,7 @@ public class BuildingPipeAnalyzer {
                 BigDecimal length = new BigDecimal(pipeMatcher.group(3));
 
                 CadItem item = new CadItem();
-                item.setName(name);
+                item.setName("楼");
                 item.setAlias(alias);
                 item.setUnit("m");
                 item.setType(TypeEnums.PIPE.getType());
@@ -196,13 +175,15 @@ public class BuildingPipeAnalyzer {
 
     private List<CadItem> generateSummary() {
         // 按公制分组统计
-        Map<String, List<CadItem>> grouped = pipeInfos.stream().collect(Collectors.groupingBy(CadItem::getName));
-
+        Map<String, Map<String, List<CadItem>>> groupedData = pipeInfos.stream()
+                .collect(Collectors.groupingBy(
+                        CadItem::getType,
+                        Collectors.groupingBy(CadItem::getNominalSpec)
+                ));
         List<CadItem> result = new ArrayList<>();
-        for (Map.Entry<String, List<CadItem>> entry : grouped.entrySet()) {
+        for (Map.Entry<String, Map<String, List<CadItem>>> entry : groupedData.entrySet()) {
             String key = entry.getKey();
-            List<CadItem> items = entry.getValue();
-            Map<String, List<CadItem>> grouped1 = items.stream().collect(Collectors.groupingBy(CadItem::getNominalSpec));
+            Map<String, List<CadItem>> grouped1 = entry.getValue();
             for (Map.Entry<String, List<CadItem>> entry1 : grouped1.entrySet()) {
                 String key1 = entry1.getKey();
                 List<CadItem> items1 = entry1.getValue();
@@ -231,26 +212,5 @@ public class BuildingPipeAnalyzer {
         result.add(floorItem);
 
         return result;
-    }
-
-    public static void main(String[] args) {
-        BuildingPipeAnalyzer analyzer = new BuildingPipeAnalyzer();
-        List<CadItem> result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\cad_file2.zip");
-        System.out.println(JSON.toJSONString(result));
-
-//        String text = " 二十层 "
-//                + "100F "
-//                + "、二十层"
-//                + "三层楼"
-//                + "零0层"
-//                + "01F"
-//                + "100F。"
-//                + "这是一层"
-//                + "独立词100F";
-//        String regex = "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)";
-//        Matcher matcher = Pattern.compile(regex).matcher(text);
-//        while (matcher.find()) {
-//            System.out.println("匹配到: " + matcher.group());
-//        }
     }
 }

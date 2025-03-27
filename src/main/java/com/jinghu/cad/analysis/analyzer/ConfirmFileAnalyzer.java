@@ -25,6 +25,12 @@ public class ConfirmFileAnalyzer {
 
     private final ConfirmFileDataList pipeInfos = new ConfirmFileDataList();
 
+    public static void main(String[] args) {
+        ConfirmFileAnalyzer analyzer = new ConfirmFileAnalyzer();
+        ConfirmFileDataList result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\江湾明珠4#-6#楼燃气管道工程-工程量确认单1.xlsx");
+        System.out.println(JSON.toJSONString(result));
+    }
+
     public ConfirmFileDataList executeAnalysis(String filePath) {
         try {
             if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
@@ -62,7 +68,6 @@ public class ConfirmFileAnalyzer {
         processFiles(xlsxPath);
     }
 
-
     /**
      * 本地DXF文件，如：D:\test.xlsx
      */
@@ -76,15 +81,15 @@ public class ConfirmFileAnalyzer {
             List<ConfirmFileData> list = EasyExcel.read(file).head(ConfirmFileData.class).sheet().doReadSync();
             for (ConfirmFileData confirmFileData : list) {
                 boolean isAdd = true;
-                if (confirmFileData.getName().contains("户内部分")) {
+                if (confirmFileData.getName().contains(ConfirmFileDataList.part1Name)) {
                     current = part1;
                     isAdd = false;
                 }
-                if (confirmFileData.getName().contains("庭院低压部分（调压箱后管道）")) {
+                if (confirmFileData.getName().contains(ConfirmFileDataList.part2Name)) {
                     current = part2;
                     isAdd = false;
                 }
-                if (confirmFileData.getName().contains("庭院中压部分（调压箱/调压柜前管道）")) {
+                if (confirmFileData.getName().contains(ConfirmFileDataList.part3Name)) {
                     current = part3;
                     isAdd = false;
                 }
@@ -116,12 +121,6 @@ public class ConfirmFileAnalyzer {
 
     private ConfirmFileDataList generateSummary() {
         return pipeInfos;
-    }
-
-    public static void main(String[] args) {
-        ConfirmFileAnalyzer analyzer = new ConfirmFileAnalyzer();
-        ConfirmFileDataList result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\江湾明珠4#-6#楼燃气管道工程-工程量确认单.xlsx");
-        System.out.println(JSON.toJSONString(result));
     }
 
 }

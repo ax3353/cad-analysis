@@ -4,7 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.enmus.TypeEnums;
 import com.jinghu.cad.analysis.pojo.CadItem;
-import com.jinghu.cad.analysis.utils.ZipFileUtils;
+import com.jinghu.cad.analysis.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.kabeja.dxf.*;
 import org.kabeja.parser.Parser;
@@ -13,14 +13,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigDecimal;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -64,14 +57,18 @@ public class OutboundPipeAnalyzer {
     private final List<CadItem> pipeInfos = new ArrayList<>();
     private final List<CadItem> flangeInfos = new ArrayList<>();
 
+    public static void main(String[] args) throws Exception {
+        OutboundPipeAnalyzer analyzer = new OutboundPipeAnalyzer();
+        List<CadItem> result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\cad_file3.zip");
+        System.out.println(JSON.toJSONString(result));
+    }
+
     public List<CadItem> executeAnalysis(String filePath) {
         try {
             if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-                processRemoteZip(filePath);
-            } else if (filePath.endsWith(".zip")) {
-                processLocalZip(filePath);
+                processRemoteFile(filePath);
             } else {
-                processDXFFile(filePath);
+                processLocalFile(new File(filePath));
             }
 
             return this.generateSummary();
@@ -84,63 +81,32 @@ public class OutboundPipeAnalyzer {
     /**
      * 远程文件，如：http://www.qq.com/test.zip
      */
-    private void processRemoteZip(String urlString) throws Exception {
-        URL url = new URL(urlString);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-
-        try (InputStream is = connection.getInputStream()) {
-            Path tempDir = Files.createTempDirectory("cad_outbound_pipe");
-            Path tempZip = Files.createTempFile("temp", ".zip");
-            Files.copy(is, tempZip, StandardCopyOption.REPLACE_EXISTING);
-            ZipFileUtils.unzip(tempZip.toString(), tempDir.toString());
-            Files.deleteIfExists(tempZip);
-            processDXFFiles(tempDir);
-        }
+    private void processRemoteFile(String urlString) throws Exception {
+        File file = FileUtils.downloadToTempFileEnhance(urlString);
+        assert file != null;
+        processLocalFile(file);
     }
 
     /**
      * 本地文件，如：D:\test.zip
      */
-    private void processLocalZip(String zipPath) throws Exception {
-        Path tempDir = Files.createTempDirectory("cad_outbound_pipeline");
-        ZipFileUtils.unzip(zipPath, tempDir.toString());
-        processDXFFiles(tempDir);
+    private void processLocalFile(File file) throws Exception {
+        processDXFFile(file);
     }
 
     /**
      * 本地DXF文件，如：D:\test.dxf
      */
-    private void processDXFFile(String dxfPath) {
+    private void processDXFFile(File file) {
         try {
             Parser parser = ParserBuilder.createDefaultParser();
-            try (FileInputStream fis = new FileInputStream(dxfPath)) {
+            try (FileInputStream fis = new FileInputStream(file)) {
                 parser.parse(fis, "UTF-8");
                 DXFDocument doc = parser.getDocument();
                 processDXFDocument(doc);
             }
         } catch (Exception e) {
-            log.error("DXF处理失败: " + dxfPath + " - " + e.getMessage());
-        }
-    }
-
-    private void processDXFFiles(Path tempDir) throws IOException {
-        Files.walk(tempDir).filter(p -> p.toString().endsWith(".dxf")
-                        && p.getFileName().toString().startsWith("出地管"))
-                .forEach(p -> processDXFFile(p.toString()));
-
-        // 删除临时文件
-        if (Files.exists(tempDir)) {
-            try {
-                Files.walk(tempDir)
-                        // 逆序遍历，先删文件再删目录
-                        .sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
-                log.info("成功删除临时目录: {}", tempDir);
-            } catch (IOException e) {
-                log.warn("删除临时目录: {} 失败", tempDir, e);
-            }
+            log.error("DXF处理失败: " + file + " - " + e.getMessage());
         }
     }
 
@@ -234,12 +200,14 @@ public class OutboundPipeAnalyzer {
         dataList.addAll(flangeInfos);
 
         // 按 alias 和 spec 共同分组
-        Map<String, List<CadItem>> grouped = dataList.stream().collect(Collectors.groupingBy(CadItem::getType));
-
+        Map<String, Map<String, List<CadItem>>> groupedData = dataList.stream()
+                .collect(Collectors.groupingBy(
+                        CadItem::getType,
+                        Collectors.groupingBy(CadItem::getNominalSpec)
+                ));
         List<CadItem> result = new ArrayList<>();
-        for (Map.Entry<String, List<CadItem>> entry : grouped.entrySet()) {
-            List<CadItem> dataList1 = entry.getValue();
-            Map<String, List<CadItem>> grouped1 = dataList1.stream().collect(Collectors.groupingBy(CadItem::getNominalSpec));
+        for (Map.Entry<String, Map<String, List<CadItem>>> entry : groupedData.entrySet()) {
+            Map<String, List<CadItem>> grouped1 = entry.getValue();
             for (Map.Entry<String, List<CadItem>> entry1 : grouped1.entrySet()) {
                 String key1 = entry1.getKey();
                 List<CadItem> items1 = entry1.getValue();
@@ -257,11 +225,5 @@ public class OutboundPipeAnalyzer {
             }
         }
         return result;
-    }
-
-    public static void main(String[] args) throws Exception {
-        OutboundPipeAnalyzer analyzer = new OutboundPipeAnalyzer();
-        List<CadItem> result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\cad_file3.zip");
-        System.out.println(JSON.toJSONString(result));
     }
 }

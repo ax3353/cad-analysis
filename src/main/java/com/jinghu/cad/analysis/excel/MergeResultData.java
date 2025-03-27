@@ -1,5 +1,6 @@
 package com.jinghu.cad.analysis.excel;
 
+import com.alibaba.excel.annotation.ExcelIgnore;
 import com.alibaba.excel.annotation.ExcelProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -8,15 +9,25 @@ import lombok.Setter;
 /**
  * @author liming
  * @version 1.0
- * @description ComplexHeadData
+ * @description MergeResultData
  * @date 2025/3/26 11:36
  */
 @Getter
 @Setter
 @EqualsAndHashCode
-public class ComplexHeadData {
+public class MergeResultData {
     @ExcelProperty({"CAD图纸智能分析结果", "基础信息", "序号"})
     private String number;
+
+    @ExcelProperty({"CAD图纸智能分析结果", "基础信息", "数据来源"})
+    private String dataOrigin;
+    /**
+     * 户内部分
+     * 庭院低压部分（调压箱后管道）
+     * 庭院中压部分（调压箱/调压柜前管道）
+     */
+    @ExcelIgnore
+    private String partType;
 
     @ExcelProperty({"CAD图纸智能分析结果", "基础信息", "名称"})
     private String name;
@@ -47,4 +58,12 @@ public class ComplexHeadData {
 
     @ExcelProperty({"CAD图纸智能分析结果", "分析结果", "对比分析"})
     private String diffPercentage;
+
+    public MergeResultData() {
+    }
+
+    public MergeResultData(String number, String name) {
+        this.number = number;
+        this.name = name;
+    }
 }
