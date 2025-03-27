@@ -29,6 +29,9 @@ public class MergeResultData {
     @ExcelIgnore
     private String partType;
 
+    @ExcelProperty({"CAD图纸智能分析结果", "基础信息", "物料编码"})
+    private String materialCode;
+
     @ExcelProperty({"CAD图纸智能分析结果", "基础信息", "名称"})
     private String name;
 

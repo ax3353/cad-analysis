@@ -1,4 +1,4 @@
-package com.jinghu.cad.analysis.resp;
+package com.jinghu.cad.analysis.vo.resp;
 
 import com.jinghu.cad.analysis.excel.MergeResultData;
 import lombok.Data;
