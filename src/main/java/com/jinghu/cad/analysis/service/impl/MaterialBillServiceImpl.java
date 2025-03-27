@@ -29,30 +29,56 @@ import java.util.stream.Collectors;
 @Service
 public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, MaterialBill> implements IMaterialBillService {
 
-    private void calc(MaterialBill bill) {
-        String[] split = bill.getMaterialName().split("_");
-        if (split.length > 1) {
-            bill.setMaterialExt1(split[0]);
-        }
-        if (split.length > 2) {
-            //有可能是材质
-            String string1 = split[1];
-            if (string1.startsWith("D") || string1.startsWith("d")) {
-                bill.setMaterialSpec(string1);
-            } else {
-                if (split.length > 3) {
-                    bill.setMaterialExt2(string1);
-                    String string2 = split[2];
-                    if (string2.startsWith("D") || string2.startsWith("d")) {
-                        bill.setMaterialSpec(string2);
-                    }
-                }
-            }
-        }
-        if (StringUtils.isNotBlank(bill.getMaterialSpec())) {
-            bill.setMaterialNominalSpec(PipeDiameter.getPipeDiameterStr(bill.getMaterialSpec()));
+
+    //钢制弯头
+    //钢制三通
+    //钢制异径管
+    //金属法兰
+    //特殊钢制管件
+    //钢制弯管
+    //工业金属软管
+    //PE100燃气管
+    //电熔套筒
+    //电熔变径
+    //热熔变径
+    //电熔三通
+    //热熔三通
+    //电熔弯头
+    //热熔弯头
+    private static final Pattern PIPE_REGEX = Pattern.compile("(热镀锌钢管|无缝钢管|喷塑钢管|螺旋钢管)_([^_]+)_(D[^_]+).*");
+    private static final Pattern FERRULE_REGEX = Pattern.compile("(钢制法兰球阀|焊接连接闸阀|止回阀|钢制针形截止阀).*(D[^_]+).*");
+
+    public static void main(String[] args) {
+        String a = "钢制法兰球阀_手轮、手柄、扳手_法兰连接_浮动式_氟塑料_PN16_WCB_DN15_无放散";
+        Matcher matcher = FERRULE_REGEX.matcher(a);
+        while (matcher.find()) {
+            System.out.println(matcher.group(1));
+            System.out.println(matcher.group(2));
         }
     }
+
+    /**
+     * 暂定：防腐漆(防腐漆_喷塑钢管补口_底漆环氧粉末+面漆聚酯粉末)
+     *
+     * @param bill
+     */
+    private void calc(MaterialBill bill) {
+        Matcher pipeMatcher = PIPE_REGEX.matcher(bill.getMaterialName());
+        if (pipeMatcher.find()) {
+            bill.setMaterialExt1(pipeMatcher.group(1));
+            bill.setMaterialExt2(pipeMatcher.group(2));
+            bill.setMaterialSpec(pipeMatcher.group(3));
+            bill.setMaterialNominalSpec(PipeDiameter.getPipeDiameterStr(bill.getMaterialSpec()));
+        } else {
+            Matcher ferruleMatcher = FERRULE_REGEX.matcher(bill.getMaterialName());
+            if (ferruleMatcher.find()) {
+                bill.setMaterialExt1(ferruleMatcher.group(1));
+                bill.setMaterialSpec(ferruleMatcher.group(2)); // 修正错误
+                bill.setMaterialNominalSpec(PipeDiameter.getPipeDiameterStr(bill.getMaterialSpec()));
+            }
+        }
+    }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)
