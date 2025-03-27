@@ -43,30 +43,14 @@ public class BuildingPipeAnalyzer {
                     "$",                                  // 锚定字符串结束
             Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern PAI_SHAPED_BEND_PATTERN = Pattern.compile(
+            "^π型弯",                                  // 锚定字符串结束
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final List<CadItem> pipeInfos = new ArrayList<>();
     private int floorCounts = 0;
-
-    public static void main(String[] args) {
-        BuildingPipeAnalyzer analyzer = new BuildingPipeAnalyzer();
-        List<CadItem> result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\cad_file2.zip");
-        System.out.println(JSON.toJSONString(result));
-
-//        String text = " 二十层 "
-//                + "100F "
-//                + "、二十层"
-//                + "三层楼"
-//                + "零0层"
-//                + "01F"
-//                + "100F。"
-//                + "这是一层"
-//                + "独立词100F";
-//        String regex = "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)";
-//        Matcher matcher = Pattern.compile(regex).matcher(text);
-//        while (matcher.find()) {
-//            System.out.println("匹配到: " + matcher.group());
-//        }
-    }
+    private int paiCounts = 0;
 
     public List<CadItem> executeAnalysis(String filePath) {
         try {
@@ -145,6 +129,7 @@ public class BuildingPipeAnalyzer {
         try {
             String currentText = text.getText().trim().replaceAll("\\s+", "");
             Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
+            Matcher paishapedBendMatcher = PAI_SHAPED_BEND_PATTERN.matcher(currentText);
             Matcher floorMatcher = FLOOR_PATTERN.matcher(currentText);
 
             if (pipeMatcher.find()) {
@@ -165,6 +150,8 @@ public class BuildingPipeAnalyzer {
                 item.setSpec(spec);
                 item.setNominalSpec(PipeDiameter.getPipeDiameter(spec).getNominalDiameterAlias());
                 pipeInfos.add(item);
+            } else if (paishapedBendMatcher.find()) {
+                paiCounts++;
             } else if (floorMatcher.find()) {
                 floorCounts++;
             }
@@ -211,6 +198,37 @@ public class BuildingPipeAnalyzer {
         floorItem.setNominalSpec("");
         result.add(floorItem);
 
+        CadItem paiItem = new CadItem();
+        paiItem.setName("π型弯");
+        paiItem.setAlias("-");
+        paiItem.setUnit("个");
+        paiItem.setType(TypeEnums.PAI_SHAPED_BEND.getType());
+        paiItem.setData(BigDecimal.valueOf(paiCounts));
+        paiItem.setSpec("-");
+        paiItem.setNominalSpec("-");
+        result.add(paiItem);
+
         return result;
+    }
+
+    public static void main(String[] args) {
+        BuildingPipeAnalyzer analyzer = new BuildingPipeAnalyzer();
+        List<CadItem> result = analyzer.executeAnalysis("C:\\Users\\Liming\\Desktop\\cad_file2.zip");
+        System.out.println(JSON.toJSONString(result));
+
+//        String text = " 二十层 "
+//                + "100F "
+//                + "、二十层"
+//                + "三层楼"
+//                + "零0层"
+//                + "01F"
+//                + "100F。"
+//                + "这是一层"
+//                + "独立词100F";
+//        String regex = "(?<!\\S)([一二三四五六七八九十零百千万]+层|[1-9]\\d*F)(?!\\S)";
+//        Matcher matcher = Pattern.compile(regex).matcher(text);
+//        while (matcher.find()) {
+//            System.out.println("匹配到: " + matcher.group());
+//        }
     }
 }

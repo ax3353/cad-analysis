@@ -37,12 +37,17 @@ public class OutboundPipeAnalyzer {
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final Pattern FLANGE_PATTERN = Pattern.compile(
+    private static final Pattern FLANGE_BALL_VALVE_PATTERN = Pattern.compile(
             "(法兰球阀)" +                      // 目标配件类型
                     "(DN\\d+(?:\\.\\d+)?)" +        // 配件规格
                     "(?!.*\\d+\\s*[m米])",          // 排除含长度单位的情况
             Pattern.CASE_INSENSITIVE);
-    private static final Pattern HOSE_PATTERN = Pattern.compile(
+    private static final Pattern METAL_BALL_VALVE_PATTERN = Pattern.compile(
+            "(金属球阀)" +                      // 目标配件类型
+                    "(DN\\d+(?:\\.\\d+)?)" +        // 配件规格
+                    "(?!.*\\d+\\s*[m米])",          // 排除含长度单位的情况
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern METAL_HOSE_PATTERN = Pattern.compile(
             "(金属软管)" +                      // 目标配件类型
                     "(DN\\d+(?:\\.\\d+)?)" +        // 配件规格
                     "(?!.*\\d+\\s*[m米])",          // 排除含长度单位的情况
@@ -54,8 +59,7 @@ public class OutboundPipeAnalyzer {
             Pattern.CASE_INSENSITIVE);
 
 
-    private final List<CadItem> pipeInfos = new ArrayList<>();
-    private final List<CadItem> flangeInfos = new ArrayList<>();
+    private final List<CadItem> cadItems = new ArrayList<>();
 
     public static void main(String[] args) throws Exception {
         OutboundPipeAnalyzer analyzer = new OutboundPipeAnalyzer();
@@ -140,8 +144,9 @@ public class OutboundPipeAnalyzer {
         try {
             String currentText = text.getText().trim().replaceAll("\\s+", "");
             Matcher pipeMatcher = PIPE_PATTERN.matcher(currentText);
-            Matcher flangeMatcher = FLANGE_PATTERN.matcher(currentText);
-            Matcher metalRubberMatcher = HOSE_PATTERN.matcher(currentText);
+            Matcher flangeBallValveMatcher = FLANGE_BALL_VALVE_PATTERN.matcher(currentText);
+            Matcher metalBallValveMatcher = METAL_BALL_VALVE_PATTERN.matcher(currentText);
+            Matcher metalHoseMatcher = METAL_HOSE_PATTERN.matcher(currentText);
             Matcher flangeCoverMatcher = FLANGE_COVER_PATTERN.matcher(currentText);
 
             if (pipeMatcher.find()) {
@@ -160,47 +165,52 @@ public class OutboundPipeAnalyzer {
                 item.setData(length);
                 item.setSpec(spec);
                 item.setNominalSpec(PipeDiameter.getPipeDiameter(spec).getNominalDiameterAlias());
-                pipeInfos.add(item);
-            } else if (flangeMatcher.find()) {
+                cadItems.add(item);
+            } else if (flangeBallValveMatcher.find()) {
                 CadItem item = new CadItem();
-                item.setAlias(flangeMatcher.group(1));
+                item.setAlias(flangeBallValveMatcher.group(1));
                 item.setUnit("个");
-                item.setType(TypeEnums.FERRULE.getType());
+                item.setType(TypeEnums.FERRULE_BALL_VALVE.getType());
                 item.setData(new BigDecimal(1));
-                item.setSpec(flangeMatcher.group(2).toUpperCase());
+                item.setSpec(flangeBallValveMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
-                pipeInfos.add(item);
-            } else if (metalRubberMatcher.find()) {
+                cadItems.add(item);
+            } else if (metalBallValveMatcher.find()) {
                 CadItem item = new CadItem();
-                item.setAlias(flangeMatcher.group(1));
+                item.setAlias(metalBallValveMatcher.group(1));
                 item.setUnit("个");
-                item.setType(TypeEnums.METAL_RUBBER.getType());
+                item.setType(TypeEnums.METAL_BALL_VALVE.getType());
                 item.setData(new BigDecimal(1));
-                item.setSpec(flangeMatcher.group(2).toUpperCase());
+                item.setSpec(metalBallValveMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
-                pipeInfos.add(item);
+            } else if (metalHoseMatcher.find()) {
+                CadItem item = new CadItem();
+                item.setAlias(flangeBallValveMatcher.group(1));
+                item.setUnit("个");
+                item.setType(TypeEnums.METAL_HOSE.getType());
+                item.setData(new BigDecimal(1));
+                item.setSpec(flangeBallValveMatcher.group(2).toUpperCase());
+                item.setNominalSpec(item.getSpec());
+                cadItems.add(item);
             } else if (flangeCoverMatcher.find()) {
                 CadItem item = new CadItem();
-                item.setAlias(flangeMatcher.group(1));
+                item.setAlias(flangeBallValveMatcher.group(1));
                 item.setUnit("个");
                 item.setType(TypeEnums.FERRULE_COVER.getType());
                 item.setData(new BigDecimal(1));
-                item.setSpec(flangeMatcher.group(2).toUpperCase());
+                item.setSpec(flangeBallValveMatcher.group(2).toUpperCase());
                 item.setNominalSpec(item.getSpec());
-                pipeInfos.add(item);
+                cadItems.add(item);
             }
         } catch (Exception e) {
-            log.error("文本解析异常: " + text.getText() + " - " + e.getMessage());
+            log.error("文本解析异常: {} - {}", text.getText(), e.getMessage());
         }
     }
 
     private List<CadItem> generateSummary() {
-        List<CadItem> dataList = new ArrayList<>();
-        dataList.addAll(pipeInfos);
-        dataList.addAll(flangeInfos);
 
         // 按 alias 和 spec 共同分组
-        Map<String, Map<String, List<CadItem>>> groupedData = dataList.stream()
+        Map<String, Map<String, List<CadItem>>> groupedData = cadItems.stream()
                 .collect(Collectors.groupingBy(
                         CadItem::getType,
                         Collectors.groupingBy(CadItem::getNominalSpec)

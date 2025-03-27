@@ -102,7 +102,18 @@ public class ConfirmFileAnalyzer {
                         isMatch = true;
                     }
                     if (confirmFileData.getName().contains("法兰球阀")) {
-                        confirmFileData.setType(TypeEnums.FERRULE.getType());
+                        confirmFileData.setType(TypeEnums.FERRULE_BALL_VALVE.getType());
+                        confirmFileData.setNominalSpec(confirmFileData.getWorkSpec());
+                        isMatch = true;
+                    }
+                    if (confirmFileData.getName().contains("金属球阀")) {
+                        confirmFileData.setType(TypeEnums.METAL_BALL_VALVE.getType());
+                        confirmFileData.setNominalSpec(confirmFileData.getWorkSpec());
+                        isMatch = true;
+                    }
+                    if (confirmFileData.getName().contains("金属软管")) {
+                        confirmFileData.setType(TypeEnums.METAL_HOSE.getType());
+                        confirmFileData.setNominalSpec(confirmFileData.getWorkSpec());
                         isMatch = true;
                     }
                     if (!isMatch) {
