@@ -20,13 +20,13 @@ public class ReportTest {
 
     @Test
     public void doReport() throws Exception {
-//        String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\津都雅苑1\\津都雅苑-户数.dxf";
-//        String outboundPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\津都雅苑1\\津都雅苑-出地管道.dxf";
-//        String confirmFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\津都雅苑1\\津都雅苑-工程量确认单.xlsx";
+        String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\津都雅苑1\\津都雅苑-户数.dxf";
+        String outboundPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\津都雅苑1\\津都雅苑-出地管道.dxf";
+        String confirmFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\津都雅苑1\\津都雅苑-工程量确认单.xlsx";
 
-        String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\建友爱路生活区1\\建友爱路生活区-户数.dxf";
-        String outboundPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\建友爱路生活区1\\建友爱路生活区-出地管道.dxf";
-        String confirmFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\建友爱路生活区1\\建友爱路生活区-工程量确认单.xlsx";
+//        String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\建友爱路生活区1\\建友爱路生活区-户数.dxf";
+//        String outboundPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\建友爱路生活区1\\建友爱路生活区-出地管道.dxf";
+//        String confirmFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\建友爱路生活区1\\建友爱路生活区-工程量确认单.xlsx";
 
 //        String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\江湾明珠1\\江湾明珠-户数.dxf";
 //        String outboundPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\江湾明珠1\\江湾明珠-出地管道.dxf";
