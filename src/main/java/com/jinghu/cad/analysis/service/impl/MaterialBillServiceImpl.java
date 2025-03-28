@@ -53,15 +53,15 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     //PE100燃气管_SDR17_dn200_11.9mm_黑色管材_橙色色条_GB 15558.1_直管
     private static final Pattern PIPE_PE_REGEX = Pattern.compile("^(PE\\d+燃气管)_([^_]+)_([^_]+).*");
 
-    public static void main(String[] args) {
-        String a = "PE100燃气管_SDR17_dn200_11.9mm_黑色管材_橙色色条_GB 15558.1_直管";
-        Matcher matcher = PIPE_PE_REGEX.matcher(a);
-        while (matcher.find()) {
-            System.out.println(matcher.group(1));
-            System.out.println(matcher.group(2));
-            System.out.println(matcher.group(3));
-        }
-    }
+//    public static void main(String[] args) {
+//        String a = "PE100燃气管_SDR17_dn200_11.9mm_黑色管材_橙色色条_GB 15558.1_直管";
+//        Matcher matcher = PIPE_PE_REGEX.matcher(a);
+//        while (matcher.find()) {
+//            System.out.println(matcher.group(1));
+//            System.out.println(matcher.group(2));
+//            System.out.println(matcher.group(3));
+//        }
+//    }
 
     /**
      * 暂定：防腐漆(防腐漆_喷塑钢管补口_底漆环氧粉末+面漆聚酯粉末)
@@ -127,17 +127,18 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
      */
     private static final Pattern PIPE_REGEX_1 = Pattern.compile("(喷塑直缝钢管|喷塑钢管|镀锌钢管).*(DN?\\d+(?:\\.\\d+)?).*");
     //PE100 管材 SDR11 dn40
-    private static final Pattern PIPE_PE_REGEX_1 = Pattern.compile("(PE\\d+)\\s*(?:管材)?\\s*(SDR\\d+)\\s*(dn\\d+(?:\\.\\d+)?)");
+    private static final Pattern PIPE_PE_REGEX_1 = Pattern.compile("(PE\\d+)\\s*(管材)\\s*(SDR\\d+)\\s*(dn\\d+(?:\\.\\d+)?)");
 
-//    public static void main(String[] args) {
-//        String a = "PE100 管材 SDR11 dn40";
-//        Matcher matcher = PIPE_PE_REGEX_1.matcher(a);
-//        while (matcher.find()) {
-//            System.out.println(matcher.group(1));
-//            System.out.println(matcher.group(2));
-//            System.out.println(matcher.group(3));
-//        }
-//    }
+    public static void main(String[] args) {
+        String a = "PE100 管材 SDR11 dn40";
+        Matcher matcher = PIPE_PE_REGEX_1.matcher(a);
+        while (matcher.find()) {
+            System.out.println(matcher.group(1));
+            System.out.println(matcher.group(2));
+            System.out.println(matcher.group(3));
+            System.out.println(matcher.group(4));
+        }
+    }
 
     @Override
     public String getMaterialCode(String name) {
@@ -154,14 +155,18 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
                 return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
             }
             matcher = PIPE_PE_REGEX_1.matcher(name);
-//        if (matcher.find()) {
-//            String materialName = matcher.group(1);
-//            String materialExt1 = matcher.group(2);
-//            String materialSpec = matcher.group(3);
-//            String materialNominalSpec = PipeDiameter.getPipeDiameterStr(materialSpec);
-//            List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialName).eq(MaterialBill::getMaterialNominalSpec, materialNominalSpec).list();
-//            return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
-//        }
+            if (matcher.find()) {
+                String materialExt1 = matcher.group(1);
+                String materialName = matcher.group(2);
+                if ("管材".equals(materialName)) {
+                    materialName = "PE管材";
+                }
+                String materialExt2 = matcher.group(3);
+                String materialSpec = matcher.group(4);
+                String materialNominalSpec = PipeDiameter.getPipeDiameterStr(materialSpec);
+                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialName).eq(MaterialBill::getMaterialExt1, materialExt1).eq(MaterialBill::getMaterialExt2, materialExt2).eq(MaterialBill::getMaterialNominalSpec, materialNominalSpec).list();
+                return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
+            }
         } catch (Exception e) {
             log.error("获取材料编码失败", e);
         }
