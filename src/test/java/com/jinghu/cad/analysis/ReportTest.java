@@ -1,6 +1,6 @@
 package com.jinghu.cad.analysis;
 
-import com.jinghu.cad.analysis.controller.ReportController;
+import com.jinghu.cad.analysis.service.IReportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -16,7 +16,7 @@ import javax.annotation.Resource;
 public class ReportTest {
 
     @Resource
-    private ReportController controller;
+    private IReportService iReportService;
 
     @Test
     public void doReport() throws Exception {
@@ -31,6 +31,6 @@ public class ReportTest {
 //        String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\江湾明珠1\\江湾明珠-户数.dxf";
 //        String outboundPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\江湾明珠1\\江湾明珠-出地管道.dxf";
 //        String confirmFileAbsPath = "C:\\Users\\Liming\\Desktop\\识别文件\\江湾明珠1\\江湾明珠-工程量确认单.xlsx";
-        controller.doReport(buildingPipeFileAbsPath, outboundPipeFileAbsPath, confirmFileAbsPath);
+        iReportService.doReport(buildingPipeFileAbsPath, outboundPipeFileAbsPath, confirmFileAbsPath);
     }
 }

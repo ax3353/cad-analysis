@@ -7,17 +7,20 @@ import com.jinghu.cad.analysis.delegate.MergeDelegate;
 import com.jinghu.cad.analysis.dto.CadItem;
 import com.jinghu.cad.analysis.excel.ConfirmFileDataList;
 import com.jinghu.cad.analysis.excel.MergeResultDataList;
+import com.jinghu.cad.analysis.service.IReportService;
 import com.jinghu.cad.analysis.utils.FileUtils;
 import com.jinghu.cad.analysis.vo.req.ReportRequest;
 import com.jinghu.cad.analysis.vo.resp.R;
 import com.jinghu.cad.analysis.vo.resp.ReportResp;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.annotation.Resource;
 import java.io.File;
 import java.util.List;
 
@@ -26,8 +29,8 @@ import java.util.List;
 @RequestMapping("/")
 public class ReportController {
 
-    @Value("${file.upload-path}")
-    private String uploadPath;
+    @Resource
+    private IReportService iReportService;
 
     @PostMapping("/report")
     public R<?> report(@RequestBody ReportRequest request) {
@@ -56,7 +59,7 @@ public class ReportController {
             String outboundPipeFileAbsPath = outboundPipeFile.getAbsolutePath();
             String confirmFileAbsPath = confirmFile.getAbsolutePath();
 
-            ReportResp resp = doReport(buildingPipeFileAbsPath, outboundPipeFileAbsPath, confirmFileAbsPath);
+            ReportResp resp = iReportService.doReport(buildingPipeFileAbsPath, outboundPipeFileAbsPath, confirmFileAbsPath);
 
             log.info("完成CAD图纸识别，返回结果: {}", resp);
             return R.success(resp);
@@ -71,23 +74,5 @@ public class ReportController {
             log.info("删除CAD临时文件");
         }
     }
-
-    public ReportResp doReport(String buildingPipeFileAbsPath, String outboundPipeFileAbsPath, String confirmFileAbsPath) {
-        // 2. 解析出地管数据
-        List<CadItem> outboundPipeData = new OutboundPipeAnalyzer().executeAnalysis(outboundPipeFileAbsPath);
-
-        // 3. 解析建筑管道数据
-        List<CadItem> buildingPipeData = new BuildingPipeAnalyzer().executeAnalysis(buildingPipeFileAbsPath);
-
-        // 7. 合并工程量确认单
-        ConfirmFileDataList confirmFileDataList = new ConfirmFileAnalyzer().executeAnalysis(confirmFileAbsPath);
-        MergeResultDataList merge = MergeDelegate.merge(buildingPipeData, outboundPipeData, confirmFileDataList);
-        File file = MergeDelegate.generateExcel(uploadPath, merge);
-        ReportResp reportResp = new ReportResp();
-        reportResp.setReportFileUrl(FileUtils.getUrl(file));
-        reportResp.setReportDetail(merge.adapter());
-        return reportResp;
-    }
-
 
 }
