@@ -13,7 +13,6 @@ import com.jinghu.cad.analysis.vo.resp.R;
 import com.jinghu.cad.analysis.vo.resp.ReportResp;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,7 +24,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/")
-public class ReportController implements CommandLineRunner {
+public class ReportController {
 
     @Value("${file.upload-path}")
     private String uploadPath;
@@ -73,7 +72,7 @@ public class ReportController implements CommandLineRunner {
         }
     }
 
-    private ReportResp doReport(String buildingPipeFileAbsPath, String outboundPipeFileAbsPath, String confirmFileAbsPath) {
+    public ReportResp doReport(String buildingPipeFileAbsPath, String outboundPipeFileAbsPath, String confirmFileAbsPath) {
         // 2. 解析出地管数据
         List<CadItem> outboundPipeData = new OutboundPipeAnalyzer().executeAnalysis(outboundPipeFileAbsPath);
 
@@ -90,13 +89,5 @@ public class ReportController implements CommandLineRunner {
         return reportResp;
     }
 
-    @Override
-    public void run(String... args) throws Exception {
-        ReportController controller = new ReportController();
-        controller.uploadPath = "D:/upload/";
-        String buildingPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\1津都雅苑-户数(1).dxf";
-        String outboundPipeFileAbsPath = "C:\\Users\\Liming\\Desktop\\1津都雅苑-出地管道.dxf";
-        String confirmFileAbsPath = "C:\\Users\\Liming\\Desktop\\完工确认单(1).xlsx";
-        controller.doReport(buildingPipeFileAbsPath, outboundPipeFileAbsPath, confirmFileAbsPath);
-    }
+
 }
