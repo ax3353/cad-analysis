@@ -52,10 +52,12 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     private static final Pattern METAL_HOSE_REGEX = Pattern.compile("(工业金属软管).*(D[^_]+).*");
     //PE100燃气管_SDR17_dn200_11.9mm_黑色管材_橙色色条_GB 15558.1_直管
     private static final Pattern PIPE_PE_REGEX = Pattern.compile("^(PE\\d+燃气管)_([^_]+)_([^_]+).*");
+    //调压箱_RX100_0.1-0.4Mpa_2-30Kpa_100Nm3/h_DN50_DN50_天然气_不锈钢
+    private static final Pattern REGULATOR_BOX_REGEX = Pattern.compile("^(调压箱)_([^_]+).*");
 
 //    public static void main(String[] args) {
-//        String a = "PE100燃气管_SDR17_dn200_11.9mm_黑色管材_橙色色条_GB 15558.1_直管";
-//        Matcher matcher = PIPE_PE_REGEX.matcher(a);
+//        String a = "调压箱_RX100_0.1-0.4Mpa_2-30Kpa_100Nm3/h_DN50_DN50_天然气_不锈钢";
+//        Matcher matcher = REGULATOR_BOX_REGEX.matcher(a);
 //        while (matcher.find()) {
 //            System.out.println(matcher.group(1));
 //            System.out.println(matcher.group(2));
@@ -104,6 +106,12 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
             bill.setMaterialSpec(pipePEMatcher.group(3));
             bill.setMaterialNominalSpec(PipeDiameter.getPipeDiameterStr(bill.getMaterialSpec()));
         }
+
+        Matcher regulatorBoxMatcher = REGULATOR_BOX_REGEX.matcher(materialName);
+        if (regulatorBoxMatcher.find()) {
+            bill.setMaterialExt1(regulatorBoxMatcher.group(1));
+            bill.setMaterialSpec(regulatorBoxMatcher.group(2));
+        }
     }
 
 
@@ -128,10 +136,13 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     private static final Pattern PIPE_REGEX_1 = Pattern.compile("(喷塑直缝钢管|喷塑钢管|镀锌钢管).*(DN?\\d+(?:\\.\\d+)?).*");
     //PE100 管材 SDR11 dn40
     private static final Pattern PIPE_PE_REGEX_1 = Pattern.compile("(PE\\d+)\\s*(管材)\\s*(SDR\\d+)\\s*(dn\\d+(?:\\.\\d+)?)");
+    //调压箱 RX200
+    private static final Pattern REGULATOR_BOX_REGEX_1 = Pattern.compile("^(调压箱)\\s*(RX\\d+)");
+
 
     public static void main(String[] args) {
-        String a = "PE100 管材 SDR11 dn40";
-        Matcher matcher = PIPE_PE_REGEX_1.matcher(a);
+        String a = "调压箱 RX200";
+        Matcher matcher = REGULATOR_BOX_REGEX_1.matcher(a);
         while (matcher.find()) {
             System.out.println(matcher.group(1));
             System.out.println(matcher.group(2));
@@ -165,6 +176,13 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
                 String materialSpec = matcher.group(4);
                 String materialNominalSpec = PipeDiameter.getPipeDiameterStr(materialSpec);
                 List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialName).eq(MaterialBill::getMaterialExt1, materialExt1).eq(MaterialBill::getMaterialExt2, materialExt2).eq(MaterialBill::getMaterialNominalSpec, materialNominalSpec).list();
+                return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
+            }
+            matcher = REGULATOR_BOX_REGEX_1.matcher(name);
+            if (matcher.find()) {
+                String materialName = matcher.group(1);
+                String materialSpec = matcher.group(2);
+                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialName).eq(MaterialBill::getMaterialSpec, materialSpec).list();
                 return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
             }
         } catch (Exception e) {

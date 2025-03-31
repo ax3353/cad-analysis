@@ -119,6 +119,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <includeSystemScope>true</includeSystemScope>
+                </configuration>
             </plugin>
             <!--不加这个，springboot v2.6.6 install会报错，加上就好了-->
             <plugin>
@@ -133,7 +136,7 @@
                 <filtering>true</filtering>
             </resource>
         </resources>
-        <finalName>jinghu-agent-application</finalName>
+        <finalName>cad-analysis</finalName>
     </build>
 
 </project>
