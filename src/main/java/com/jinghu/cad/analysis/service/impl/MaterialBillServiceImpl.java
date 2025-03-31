@@ -58,12 +58,15 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     private static final Pattern PE_VALVE_REGEX = Pattern.compile("^PE球阀_(PE\\d+)_([^_]+)_([^_]+).*");
     //示踪线_铜包钢_2.5mm² 双线_500m/卷
     private static final Pattern TRACER_LINE_REGEX = Pattern.compile("示踪线_铜包钢_([^_]+)\\s.*");
+    //钢纤维混凝土井盖_圆形_Ф200_B125_C30_12
+    private static final Pattern MANHOLE_COVER_REGEX = Pattern.compile("^([^_]+井盖).*([^_]+形)_(\\D{1})(\\d+).*");
 //    public static void main(String[] args) {
-//        String a = "示踪线_铜包钢_2.5mm² 双线_500m/卷";
-//        Matcher matcher = TRACER_LINE_REGEX.matcher(a);
+//        String a = "复合材料井盖_复合材料_圆形_Ф700_A15_7";
+//        Matcher matcher = MANHOLE_COVER_REGEX.matcher(a);
 //        while (matcher.find()) {
 //            System.out.println(matcher.group(1));
 //            System.out.println(matcher.group(2));
+//            System.out.println(matcher.group(3));
 //            System.out.println(matcher.group(3));
 //        }
 //    }
@@ -114,6 +117,7 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
         if (regulatorBoxMatcher.find()) {
             bill.setMaterialExt1(regulatorBoxMatcher.group(1));
             bill.setMaterialSpec(regulatorBoxMatcher.group(2));
+            bill.setMaterialNominalSpec(PipeDiameter.getPipeDiameterStr(bill.getMaterialSpec()));
         }
 
         Matcher peValveMatcher = PE_VALVE_REGEX.matcher(materialName);
@@ -125,9 +129,17 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
         }
 
         Matcher tracerLineMatcher = TRACER_LINE_REGEX.matcher(materialName);
-        while (tracerLineMatcher.find()) {
+        if (tracerLineMatcher.find()) {
             bill.setMaterialSpec(tracerLineMatcher.group(1));
             bill.setMaterialNominalSpec(PipeDiameter.getPipeDiameterStr(bill.getMaterialSpec()));
+        }
+
+        Matcher manholeCoverMatcher = MANHOLE_COVER_REGEX.matcher(materialName);
+        if (manholeCoverMatcher.find()) {
+            bill.setMaterialExt1(manholeCoverMatcher.group(1));
+            bill.setMaterialExt2(manholeCoverMatcher.group(2));
+            bill.setMaterialSpec(manholeCoverMatcher.group(3) + manholeCoverMatcher.group(4));
+            bill.setMaterialNominalSpec(manholeCoverMatcher.group(4));
         }
     }
 
@@ -159,16 +171,19 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     private static final Pattern PE_VALVE_REGEX_1 = Pattern.compile("^(PE球阀)\\s*(dn\\d+(?:\\.\\d+)?)");
     //示踪线 2.5mm²
     private static final Pattern TRACER_LINE_REGEX_1 = Pattern.compile("^(示踪线)\\s*(\\S+)");
-//    public static void main(String[] args) {
-//        String a = "示踪线 2.5mm²";
-//        Matcher matcher = TRACER_LINE_REGEX_1.matcher(a);
-//        while (matcher.find()) {
-//            System.out.println(matcher.group(1));
-//            System.out.println(matcher.group(2));
-//            System.out.println(matcher.group(3));
-//            System.out.println(matcher.group(4));
-//        }
-//    }
+    //钢纤维混凝土井盖_圆形 Ф320
+    private static final Pattern MANHOLE_COVER_REGEX_1 = Pattern.compile("^([^_]+井盖)_([^_]+形)\\s+(\\D{1})(\\d+)");
+
+    public static void main(String[] args) {
+        String a = "钢纤维混凝土井盖_圆形 Ф320";
+        Matcher matcher = MANHOLE_COVER_REGEX_1.matcher(a);
+        while (matcher.find()) {
+            System.out.println(matcher.group(1));
+            System.out.println(matcher.group(2));
+            System.out.println(matcher.group(3));
+            System.out.println(matcher.group(4));
+        }
+    }
 
     @Override
     public String getMaterialCode(String name) {
@@ -201,21 +216,28 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
             if (matcher.find()) {
                 String materialName = matcher.group(1);
                 String materialSpec = matcher.group(2);
-                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialExt1, materialName).eq(MaterialBill::getMaterialSpec, materialSpec).list();
+                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialExt1, materialName).eq(MaterialBill::getMaterialNominalSpec, materialSpec).list();
                 return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
             }
             matcher = PE_VALVE_REGEX_1.matcher(name);
             if (matcher.find()) {
                 String materialName = matcher.group(1);
                 String materialSpec = matcher.group(2);
-                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialName).eq(MaterialBill::getMaterialSpec, materialSpec).list();
+                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialName).eq(MaterialBill::getMaterialNominalSpec, materialSpec).list();
                 return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
             }
             matcher = TRACER_LINE_REGEX_1.matcher(name);
             if (matcher.find()) {
                 String materialType = matcher.group(1);
                 String materialSpec = matcher.group(2);
-                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialType).eq(MaterialBill::getMaterialSpec, materialSpec).list();
+                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialType).eq(MaterialBill::getMaterialNominalSpec, materialSpec).list();
+                return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
+            }
+            matcher = MANHOLE_COVER_REGEX_1.matcher(name);
+            if (matcher.find()) {
+                String materialExt1 = matcher.group(1);
+                String materialSpec = matcher.group(4);
+                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialExt1, materialExt1).eq(MaterialBill::getMaterialNominalSpec, materialSpec).list();
                 return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
             }
         } catch (Exception e) {
