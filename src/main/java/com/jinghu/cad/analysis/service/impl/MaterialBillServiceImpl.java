@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jinghu.cad.analysis.enmus.PipeDiameter;
 import com.jinghu.cad.analysis.entity.MaterialBill;
 import com.jinghu.cad.analysis.excel.MaterialBill1Data;
+import com.jinghu.cad.analysis.excel.MergeResultData;
 import com.jinghu.cad.analysis.mapper.MaterialBillMapper;
 import com.jinghu.cad.analysis.service.IMaterialBillService;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -170,7 +172,7 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     //PE球阀 dn63
     private static final Pattern PE_VALVE_REGEX_1 = Pattern.compile("^(PE球阀)\\s*(dn\\d+(?:\\.\\d+)?)");
     //示踪线 2.5mm²
-    private static final Pattern TRACER_LINE_REGEX_1 = Pattern.compile("^(示踪线)\\s*(\\S+)");
+    private static final Pattern TRACER_LINE_REGEX_1 = Pattern.compile("^(示踪线)\\s*(\\S+)?");
     //钢纤维混凝土井盖_圆形 Ф320
     private static final Pattern MANHOLE_COVER_REGEX_1 = Pattern.compile("^([^_]+井盖)_([^_]+形)\\s+(\\D{1})(\\d+)");
 
@@ -186,7 +188,8 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     }
 
     @Override
-    public String getMaterialCode(String name) {
+    public String getMaterialCode(MergeResultData mergeResultData) {
+        String name = mergeResultData.getName();
         try {
             Matcher matcher = PIPE_REGEX_1.matcher(name);
             if (matcher.find()) {
@@ -230,6 +233,9 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
             if (matcher.find()) {
                 String materialType = matcher.group(1);
                 String materialSpec = matcher.group(2);
+                if (StringUtils.isBlank(materialSpec)) {
+                    materialSpec = mergeResultData.getWorkSpec();
+                }
                 List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialType).eq(MaterialBill::getMaterialNominalSpec, materialSpec).list();
                 return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
             }

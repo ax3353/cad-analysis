@@ -93,7 +93,6 @@ public class MergeDelegate {
                 mergeResultData.setNumber(String.valueOf(index2.getAndIncrement()));
                 mergeResultData.setDataOrigin("工程量确认单");
                 mergeResultData.setName(confirmFileData.getName());
-                mergeResultData.setMaterialCode(iMaterialBillService.getMaterialCode(mergeResultData.getName()));
                 mergeResultData.setNominalSpec(confirmFileData.getNominalSpec());
                 mergeResultData.setUnit(confirmFileData.getUnit());
 
@@ -121,6 +120,7 @@ public class MergeDelegate {
                     ));
 
                 }
+                mergeResultData.setMaterialCode(iMaterialBillService.getMaterialCode(mergeResultData));
                 partResult2.add(mergeResultData);
             }
         }
@@ -153,7 +153,6 @@ public class MergeDelegate {
                 mergeResultData.setNumber(String.valueOf(index2.getAndIncrement()));
                 mergeResultData.setDataOrigin("工程量确认单");
                 mergeResultData.setName(confirmFileData.getName());
-                mergeResultData.setMaterialCode(iMaterialBillService.getMaterialCode(mergeResultData.getName()));
                 mergeResultData.setNominalSpec(confirmFileData.getNominalSpec());
                 mergeResultData.setUnit(confirmFileData.getUnit());
 
@@ -175,6 +174,7 @@ public class MergeDelegate {
                     ));
 
                 }
+                mergeResultData.setMaterialCode(iMaterialBillService.getMaterialCode(mergeResultData));
                 partResult3.add(mergeResultData);
             }
         }
