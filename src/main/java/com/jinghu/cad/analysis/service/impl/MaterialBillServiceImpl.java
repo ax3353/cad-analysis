@@ -56,10 +56,11 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     private static final Pattern REGULATOR_BOX_REGEX = Pattern.compile("^(调压箱)_([^_]+).*");
     //PE球阀_PE100_dn40_SDR11_手轮、手柄、扳手_无放散_标准高度
     private static final Pattern PE_VALVE_REGEX = Pattern.compile("^PE球阀_(PE\\d+)_([^_]+)_([^_]+).*");
-
+    //示踪线_铜包钢_2.5mm² 双线_500m/卷
+    private static final Pattern TRACER_LINE_REGEX = Pattern.compile("示踪线_铜包钢_([^_]+)\\s.*");
 //    public static void main(String[] args) {
-//        String a = "PE球阀_PE100_dn40_SDR11_手轮、手柄、扳手_无放散_标准高度";
-//        Matcher matcher = PE_VALVE_REGEX.matcher(a);
+//        String a = "示踪线_铜包钢_2.5mm² 双线_500m/卷";
+//        Matcher matcher = TRACER_LINE_REGEX.matcher(a);
 //        while (matcher.find()) {
 //            System.out.println(matcher.group(1));
 //            System.out.println(matcher.group(2));
@@ -122,6 +123,12 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
             bill.setMaterialSpec(peValveMatcher.group(2));
             bill.setMaterialNominalSpec(PipeDiameter.getPipeDiameterStr(bill.getMaterialSpec()));
         }
+
+        Matcher tracerLineMatcher = TRACER_LINE_REGEX.matcher(materialName);
+        while (tracerLineMatcher.find()) {
+            bill.setMaterialSpec(tracerLineMatcher.group(1));
+            bill.setMaterialNominalSpec(PipeDiameter.getPipeDiameterStr(bill.getMaterialSpec()));
+        }
     }
 
 
@@ -150,16 +157,18 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
     private static final Pattern REGULATOR_BOX_REGEX_1 = Pattern.compile("^(调压箱)\\s*(RX\\d+)");
     //PE球阀 dn63
     private static final Pattern PE_VALVE_REGEX_1 = Pattern.compile("^(PE球阀)\\s*(dn\\d+(?:\\.\\d+)?)");
-    public static void main(String[] args) {
-        String a = "PE球阀 dn63";
-        Matcher matcher = PE_VALVE_REGEX_1.matcher(a);
-        while (matcher.find()) {
-            System.out.println(matcher.group(1));
-            System.out.println(matcher.group(2));
-            System.out.println(matcher.group(3));
-            System.out.println(matcher.group(4));
-        }
-    }
+    //示踪线 2.5mm²
+    private static final Pattern TRACER_LINE_REGEX_1 = Pattern.compile("^(示踪线)\\s*(\\S+)");
+//    public static void main(String[] args) {
+//        String a = "示踪线 2.5mm²";
+//        Matcher matcher = TRACER_LINE_REGEX_1.matcher(a);
+//        while (matcher.find()) {
+//            System.out.println(matcher.group(1));
+//            System.out.println(matcher.group(2));
+//            System.out.println(matcher.group(3));
+//            System.out.println(matcher.group(4));
+//        }
+//    }
 
     @Override
     public String getMaterialCode(String name) {
@@ -200,6 +209,13 @@ public class MaterialBillServiceImpl extends ServiceImpl<MaterialBillMapper, Mat
                 String materialName = matcher.group(1);
                 String materialSpec = matcher.group(2);
                 List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialName).eq(MaterialBill::getMaterialSpec, materialSpec).list();
+                return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
+            }
+            matcher = TRACER_LINE_REGEX_1.matcher(name);
+            if (matcher.find()) {
+                String materialType = matcher.group(1);
+                String materialSpec = matcher.group(2);
+                List<MaterialBill> list = this.lambdaQuery().eq(MaterialBill::getMaterialType, materialType).eq(MaterialBill::getMaterialSpec, materialSpec).list();
                 return list.stream().map(MaterialBill::getMaterialCode).collect(Collectors.joining(","));
             }
         } catch (Exception e) {
