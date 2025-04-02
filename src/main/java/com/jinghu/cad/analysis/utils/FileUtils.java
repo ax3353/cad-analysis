@@ -59,6 +59,12 @@ public class FileUtils {
         return "http://" + IpUtils.getHostIp().get(0) + ":" + port + "/files/" + file.getName();
     }
 
+    public static String getUrlByName(String name) {
+        String port = SpringUtils.getEnv("server.port", "8800");
+        return "http://" + IpUtils.getHostIp().get(0) + ":" + port + name;
+    }
+
+
     public static File downloadToTempFileEnhance(String url) {
         if (!StringUtils.hasText(url)) {
             return null;
