@@ -14,7 +14,7 @@
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!-- 日志文件的命名格式 -->
             <FileNamePattern>
-                agent_applog/%d{yyyy-MM-dd}/%d{yyyy-MM-dd}.%i.log
+                cad_analysis/%d{yyyy-MM-dd}/%d{yyyy-MM-dd}.%i.log
             </FileNamePattern>
             <!-- 设置立即刷新策略，这样可以尽快产生新的日志文件 -->
             <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
